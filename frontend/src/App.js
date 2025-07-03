@@ -129,7 +129,11 @@ function App() {
   const handleUpload = async () => {
     if (!selectedFile) return;
 
+    // Sofort Ladebalken anzeigen und Preview verstecken
     setUploading(true);
+    setShowPreview(false);
+    setFilePreview(null);
+
     const formData = new FormData();
     formData.append('file', selectedFile);
 
@@ -146,11 +150,11 @@ function App() {
         setSelectedFile(null);
         fetchJobs();
       } else {
-        alert(`Upload failed: ${data.detail}`);
+        alert(`Upload fehlgeschlagen: ${data.detail}`);
       }
     } catch (error) {
       console.error('Error uploading file:', error);
-      alert('Error uploading file');
+      alert('Fehler beim Upload der Datei');
     } finally {
       setUploading(false);
     }
