@@ -288,16 +288,84 @@ def test_german_address_format():
     print("\n🔍 Testing German Address Format Processing...")
     
     try:
-        # Read the sample German addresses file
-        with open('/app/sample_german_addresses.csv', 'r') as f:
+        # First test the preview endpoint with German address format
+        print("Testing preview endpoint with German address format...")
+        
+        # Read the German test addresses file
+        with open('/app/german_test_addresses.csv', 'r') as f:
             csv_content = f.read()
         
-        print(f"Loaded sample German addresses file with the following content:")
+        print(f"Loaded German test addresses file with the following content:")
         print(csv_content)
         
-        # Create file-like object for upload
+        # Test preview endpoint first
         files = {
-            'file': ('sample_german_addresses.csv', csv_content, 'text/csv')
+            'file': ('german_test_addresses.csv', csv_content, 'text/csv')
+        }
+        
+        preview_response = requests.post(f"{BACKEND_URL}/preview", files=files)
+        
+        if preview_response.status_code == 200:
+            preview_data = preview_response.json()
+            detected_format = preview_data.get("detected_format", "")
+            detected_columns = preview_data.get("detected_columns", {})
+            preview_addresses = preview_data.get("preview_addresses", [])
+            
+            print(f"Preview response: {json.dumps(preview_data, indent=2)}")
+            
+            # Verify detected format is German
+            if "German" in detected_format:
+                log_test("German Address Format Processing", f"Preview correctly detected German format: '{detected_format}'")
+            else:
+                log_test("German Address Format Processing", f"Preview failed to detect German format. Got: '{detected_format}'", False)
+            
+            # Verify detected columns
+            expected_columns = {
+                "street": "Projektname Strasse",
+                "house_number": "Hausnummer",
+                "zusatz": "Zusatz",
+                "plz": "PLZ",
+                "ort": "Ort"
+            }
+            
+            columns_correct = True
+            for col_type, expected_name in expected_columns.items():
+                detected_name = detected_columns.get(col_type)
+                if detected_name != expected_name:
+                    log_test("German Address Format Processing", 
+                            f"Column detection issue: Expected '{col_type}' to be '{expected_name}', got '{detected_name}'", False)
+                    columns_correct = False
+            
+            if columns_correct:
+                log_test("German Address Format Processing", "All German address columns correctly detected")
+            
+            # Verify preview addresses format
+            expected_address_formats = [
+                "Am Hörenberg 8, 27726 Worpswede",
+                "Hembergerstraße 29 A, 27726 Worpswede",
+                "Auf der Heide 49, 27726 Worpswede"
+            ]
+            
+            address_format_correct = True
+            for i, expected_format in enumerate(expected_address_formats):
+                if i < len(preview_addresses):
+                    preview_addr = preview_addresses[i]
+                    # Check if the preview address contains the expected format (allowing for some variation)
+                    if not (expected_format in preview_addr or 
+                           all(part in preview_addr for part in expected_format.split(", "))):
+                        log_test("German Address Format Processing", 
+                                f"Address format issue: Expected '{expected_format}', got '{preview_addr}'", False)
+                        address_format_correct = False
+                        
+            if address_format_correct and preview_addresses:
+                log_test("German Address Format Processing", "Preview addresses correctly formatted with street name, house number, postal code and city")
+        else:
+            log_test("German Address Format Processing", f"Preview endpoint failed with status code: {preview_response.status_code}", False)
+            print(f"Preview response: {preview_response.text}")
+        
+        # Now test the full upload and processing
+        files = {
+            'file': ('german_test_addresses.csv', csv_content, 'text/csv')
         }
         
         # Upload file
@@ -351,22 +419,24 @@ def test_german_address_format():
                 log_test("German Address Format Processing", "No addresses found in route data", False)
                 return None
             
-            # Check for expected combined address format
+            # Expected address formats based on our test data
             expected_formats = [
-                "Potsdamer Platz 1, 10117 Berlin",
-                "Marienplatz 8, 80331 München",
-                "Königsallee 60, 40212 Düsseldorf"
+                "Am Hörenberg 8, 27726 Worpswede",
+                "Hembergerstraße 29 A, 27726 Worpswede",
+                "Auf der Heide 49, 27726 Worpswede"
             ]
             
+            # Check if addresses were combined correctly
             found_formats = []
             for addr in addresses:
                 original = addr.get("original_address", "")
                 formatted = addr.get("formatted_address", "")
                 geocoded = addr.get("geocoded", False)
                 
-                # Check if this is one of our expected formats
+                # Check if this matches our expected format
                 for expected in expected_formats:
-                    if expected in original:
+                    # Check if the original address contains the expected format or its components
+                    if expected in original or all(part in original for part in expected.split(", ")):
                         found_formats.append(expected)
                         if geocoded:
                             log_test("German Address Format Processing", 
@@ -375,10 +445,10 @@ def test_german_address_format():
                             log_test("German Address Format Processing", 
                                     f"Failed to geocode German address: '{original}'", False)
             
-            # Verify that we found at least some of our expected formats
+            # Verify that we found our expected formats
             if found_formats:
                 log_test("German Address Format Processing", 
-                        f"German address format correctly detected and processed. Found {len(found_formats)} expected formats.")
+                        f"German address format correctly processed. Found {len(found_formats)} of {len(expected_formats)} expected formats.")
                 
                 # Test route optimization with German addresses
                 optimized_addresses = route_data.get("optimized_addresses", [])
@@ -393,8 +463,8 @@ def test_german_address_format():
                 for addr in addresses:
                     original = addr.get("original_address", "")
                     # Check for pattern: Street + Number, Postal Code + City
-                    if any(street in original for street in ["Potsdamer Platz", "Marienplatz", "Königsallee"]) and \
-                       any(city in original for city in ["Berlin", "München", "Düsseldorf"]):
+                    if any(street in original for street in ["Am Hörenberg", "Hembergerstraße", "Auf der Heide"]) and \
+                       "Worpswede" in original:
                         correct_format = True
                         log_test("German Address Format Processing", 
                                 f"Address combined correctly: '{original}'")
