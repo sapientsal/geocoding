@@ -407,7 +407,7 @@ async def process_upload_job(job_id: str, file_content: bytes, filename: str):
             
             address_id = str(uuid.uuid4())
             
-            # Geocode address
+            # Geocode address with caching
             lat, lon, formatted_addr, error = geocode_address(address_text)
             
             address = {
