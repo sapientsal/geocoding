@@ -286,7 +286,7 @@ function App() {
                   : 'bg-green-600 text-white hover:bg-green-700'
               }`}
             >
-              {uploading ? 'Uploading...' : 'Upload & Process'}
+              {uploading ? 'Hochladen...' : 'Hochladen & Verarbeiten'}
             </button>
           </div>
         </div>
