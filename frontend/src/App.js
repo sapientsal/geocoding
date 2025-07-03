@@ -180,30 +180,41 @@ function App() {
     }
   };
 
-  const exportRoute = () => {
+  const exportRouteExcel = async () => {
     if (!route) return;
 
-    const csvContent = [
-      ['Order', 'Original Address', 'Formatted Address', 'Latitude', 'Longitude', 'Geocoded'],
-      ...route.optimized_addresses.map((addr, index) => [
-        index + 1,
-        addr.original_address,
-        addr.formatted_address || '',
-        addr.latitude || '',
-        addr.longitude || '',
-        addr.geocoded ? 'Yes' : 'No'
-      ])
-    ].map(row => row.join(',')).join('\n');
-
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `optimized_route_${route.job_id}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    try {
+      const response = await fetch(`${BACKEND_URL}/api/route/${route.job_id}/export`);
+      
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        
+        // Get filename from response headers or create default
+        const contentDisposition = response.headers.get('Content-Disposition');
+        let filename = `optimized_route_${route.job_id}.xlsx`;
+        
+        if (contentDisposition) {
+          const filenameMatch = contentDisposition.match(/filename="?([^"]*)"?/);
+          if (filenameMatch) {
+            filename = filenameMatch[1];
+          }
+        }
+        
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      } else {
+        alert('Fehler beim Export der Excel-Datei');
+      }
+    } catch (error) {
+      console.error('Error exporting Excel:', error);
+      alert('Fehler beim Export der Excel-Datei');
+    }
   };
 
   return (
