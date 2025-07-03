@@ -339,9 +339,40 @@ async def process_upload_job(job_id: str, file_content: bytes, filename: str):
         
         # Process addresses
         for index, row in df.iterrows():
-            address_text = str(row[address_column]).strip()
-            if not address_text or address_text.lower() == 'nan':
-                continue
+            # Build complete address based on format
+            if has_german_format:
+                # German format: combine separate columns
+                street = str(row[street_col]).strip() if street_col else ""
+                house_num = str(row[house_num_col]).strip() if house_num_col else ""
+                plz = str(row[plz_col]).strip() if plz_col else ""
+                ort = str(row[ort_col]).strip() if ort_col else ""
+                
+                # Skip empty rows
+                if not street or not ort:
+                    continue
+                
+                # Combine into full address
+                address_parts = []
+                if street:
+                    if house_num and house_num.lower() != 'nan':
+                        address_parts.append(f"{street} {house_num}")
+                    else:
+                        address_parts.append(street)
+                
+                if plz and plz.lower() != 'nan':
+                    if ort:
+                        address_parts.append(f"{plz} {ort}")
+                    else:
+                        address_parts.append(plz)
+                elif ort:
+                    address_parts.append(ort)
+                
+                address_text = ", ".join(address_parts)
+            else:
+                # Single address column format
+                address_text = str(row[address_column]).strip()
+                if not address_text or address_text.lower() == 'nan':
+                    continue
             
             address_id = str(uuid.uuid4())
             
