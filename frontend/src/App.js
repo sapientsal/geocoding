@@ -166,17 +166,45 @@ function App() {
     
     switch (job.status) {
       case 'uploading':
-        return 10;
+        return 5;
       case 'parsing':
-        return 20;
+        return 10;
       case 'geocoding':
-        return 20 + (job.processed_addresses / job.total_addresses) * 60;
+        // More granular progress for geocoding
+        const geocodingProgress = (job.processed_addresses / job.total_addresses) * 70;
+        return 10 + geocodingProgress;
       case 'optimizing':
-        return 90;
+        return 85;
       case 'completed':
         return 100;
       default:
         return 0;
+    }
+  };
+
+  const getEstimatedTime = (job) => {
+    if (!job || job.status === 'completed' || job.status === 'error') return null;
+    
+    const remaining = job.total_addresses - job.processed_addresses;
+    
+    switch (job.status) {
+      case 'geocoding':
+        // Estimate based on improved speed (0.5 seconds per address with caching)
+        const avgTimePerAddress = 0.7; // seconds (accounting for cache hits)
+        const estimatedSeconds = remaining * avgTimePerAddress;
+        
+        if (estimatedSeconds < 60) {
+          return `~${Math.ceil(estimatedSeconds)} Sekunden`;
+        } else if (estimatedSeconds < 3600) {
+          return `~${Math.ceil(estimatedSeconds / 60)} Minuten`;
+        } else {
+          return `~${Math.ceil(estimatedSeconds / 3600)} Stunden`;
+        }
+      case 'optimizing':
+        // Route optimization is much faster
+        return '~30 Sekunden';
+      default:
+        return 'Wird geschätzt...';
     }
   };
 
