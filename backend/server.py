@@ -7,6 +7,9 @@ import time
 import math
 import uuid
 import os
+
+# Address cache for performance
+address_cache = {}
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel
 import json
