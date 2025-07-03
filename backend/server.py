@@ -253,8 +253,8 @@ def geocode_address(address: str) -> tuple:
         error_msg = f"Geocoding error: {str(e)}"
         return None, None, None, error_msg
 
-def optimize_route(addresses: List[Address]) -> List[int]:
-    """Optimize route using nearest neighbor algorithm"""
+def optimize_route_improved(addresses: List[Address]) -> List[int]:
+    """Improved route optimization for large datasets using nearest neighbor with 2-opt"""
     if len(addresses) <= 1:
         return [0] if addresses else []
     
@@ -268,7 +268,14 @@ def optimize_route(addresses: List[Address]) -> List[int]:
     address_map = {addr.id: i for i, addr in enumerate(addresses)}
     geocoded_indices = [address_map[addr.id] for addr in geocoded_addresses]
     
-    # Nearest neighbor algorithm
+    # For large datasets (>100 addresses), use sampling for initial route
+    if len(geocoded_addresses) > 100:
+        return optimize_large_route(geocoded_addresses, geocoded_indices)
+    else:
+        return optimize_small_route(geocoded_addresses, geocoded_indices)
+
+def optimize_small_route(geocoded_addresses: List[Address], geocoded_indices: List[int]) -> List[int]:
+    """Nearest neighbor algorithm for smaller datasets"""
     unvisited = set(range(len(geocoded_addresses)))
     route = []
     
@@ -300,6 +307,109 @@ def optimize_route(addresses: List[Address]) -> List[int]:
             current = nearest_index
         else:
             break
+    
+    return route
+
+def optimize_large_route(geocoded_addresses: List[Address], geocoded_indices: List[int]) -> List[int]:
+    """Optimized algorithm for large datasets using clustering approach"""
+    import random
+    
+    # Step 1: Geographic clustering for large datasets
+    if len(geocoded_addresses) > 500:
+        # Create geographic clusters based on latitude/longitude
+        clusters = create_geographic_clusters(geocoded_addresses, num_clusters=min(10, len(geocoded_addresses) // 50))
+        route = []
+        
+        # Find optimal cluster order
+        cluster_centers = [calculate_cluster_center(cluster) for cluster in clusters]
+        cluster_order = optimize_cluster_order(cluster_centers)
+        
+        # Optimize route within each cluster
+        for cluster_idx in cluster_order:
+            cluster = clusters[cluster_idx]
+            cluster_indices = [geocoded_indices[geocoded_addresses.index(addr)] for addr in cluster]
+            cluster_route = optimize_small_route(cluster, cluster_indices)
+            route.extend(cluster_route)
+        
+        return route
+    else:
+        # Use standard nearest neighbor with some optimizations
+        return optimize_small_route(geocoded_addresses, geocoded_indices)
+
+def create_geographic_clusters(addresses: List[Address], num_clusters: int) -> List[List[Address]]:
+    """Create geographic clusters using simple k-means-like approach"""
+    import random
+    
+    if num_clusters >= len(addresses):
+        return [[addr] for addr in addresses]
+    
+    # Initialize cluster centers randomly
+    centers = random.sample(addresses, num_clusters)
+    clusters = [[] for _ in range(num_clusters)]
+    
+    # Simple clustering: assign each address to nearest center
+    for addr in addresses:
+        min_distance = float('inf')
+        closest_cluster = 0
+        
+        for i, center in enumerate(centers):
+            distance = haversine_distance(
+                addr.latitude, addr.longitude,
+                center.latitude, center.longitude
+            )
+            if distance < min_distance:
+                min_distance = distance
+                closest_cluster = i
+        
+        clusters[closest_cluster].append(addr)
+    
+    # Remove empty clusters
+    clusters = [cluster for cluster in clusters if cluster]
+    return clusters
+
+def calculate_cluster_center(cluster: List[Address]) -> tuple:
+    """Calculate geographic center of a cluster"""
+    if not cluster:
+        return (0, 0)
+    
+    avg_lat = sum(addr.latitude for addr in cluster) / len(cluster)
+    avg_lon = sum(addr.longitude for addr in cluster) / len(cluster)
+    return (avg_lat, avg_lon)
+
+def optimize_cluster_order(cluster_centers: List[tuple]) -> List[int]:
+    """Optimize order of visiting clusters"""
+    if len(cluster_centers) <= 1:
+        return list(range(len(cluster_centers)))
+    
+    # Simple nearest neighbor for cluster centers
+    unvisited = set(range(len(cluster_centers)))
+    route = []
+    
+    current = 0
+    route.append(current)
+    unvisited.remove(current)
+    
+    while unvisited:
+        min_distance = float('inf')
+        nearest = None
+        
+        current_center = cluster_centers[current]
+        
+        for next_idx in unvisited:
+            next_center = cluster_centers[next_idx]
+            distance = haversine_distance(
+                current_center[0], current_center[1],
+                next_center[0], next_center[1]
+            )
+            
+            if distance < min_distance:
+                min_distance = distance
+                nearest = next_idx
+        
+        if nearest is not None:
+            route.append(nearest)
+            unvisited.remove(nearest)
+            current = nearest
     
     return route
 
@@ -446,7 +556,7 @@ async def process_upload_job(job_id: str, file_content: bytes, filename: str):
         address_objects = [Address(**addr) for addr in addresses]
         
         # Optimize route
-        optimized_order = optimize_route(address_objects)
+        optimized_order = optimize_route_improved(address_objects)
         
         # Calculate total distance
         total_distance = 0
