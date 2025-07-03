@@ -394,10 +394,10 @@ function App() {
 
         {/* Jobs List */}
         <div className="bg-white rounded-lg shadow-lg p-8">
-          <h2 className="text-2xl font-semibold text-gray-800 mb-6">Upload History</h2>
+          <h2 className="text-2xl font-semibold text-gray-800 mb-6">Upload-Verlauf</h2>
           
           {jobs.length === 0 ? (
-            <p className="text-gray-500 text-center py-8">No uploads yet. Upload your first address list above!</p>
+            <p className="text-gray-500 text-center py-8">Noch keine Uploads. Laden Sie Ihre erste Adressliste oben hoch!</p>
           ) : (
             <div className="space-y-4">
               {jobs.map((job) => (
@@ -406,16 +406,27 @@ function App() {
                     <div>
                       <h3 className="text-lg font-semibold text-gray-800">{job.filename}</h3>
                       <p className="text-sm text-gray-500">
-                        Uploaded: {new Date(job.created_at).toLocaleDateString()}
+                        Hochgeladen: {new Date(job.created_at).toLocaleDateString('de-DE')}
                       </p>
+                      {job.status === 'completed' && job.completed_at && (
+                        <p className="text-sm text-green-600">
+                          Fertiggestellt: {new Date(job.completed_at).toLocaleDateString('de-DE')} um {new Date(job.completed_at).toLocaleTimeString('de-DE')}
+                        </p>
+                      )}
                     </div>
                     <div className="flex items-center space-x-3">
                       <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(job.status)}`}>
-                        {job.status.charAt(0).toUpperCase() + job.status.slice(1)}
+                        {job.status === 'completed' ? 'Abgeschlossen' :
+                         job.status === 'error' ? 'Fehler' :
+                         job.status === 'geocoding' ? 'Geocodierung' :
+                         job.status === 'optimizing' ? 'Optimierung' :
+                         job.status === 'parsing' ? 'Verarbeitung' :
+                         job.status === 'uploading' ? 'Upload' : job.status}
                       </span>
                       <button
                         onClick={() => handleDeleteJob(job.id)}
                         className="text-red-600 hover:text-red-800 transition-colors"
+                        title="Job löschen"
                       >
                         🗑️
                       </button>
@@ -424,16 +435,16 @@ function App() {
                   
                   <div className="grid grid-cols-3 gap-4 text-sm mb-4">
                     <div>
-                      <span className="text-gray-600">Total:</span>
+                      <span className="text-gray-600">Gesamt:</span>
                       <span className="font-semibold ml-2">{job.total_addresses}</span>
                     </div>
                     <div>
-                      <span className="text-gray-600">Processed:</span>
+                      <span className="text-gray-600">Verarbeitet:</span>
                       <span className="font-semibold ml-2">{job.processed_addresses}</span>
                     </div>
                     <div>
-                      <span className="text-gray-600">Geocoded:</span>
-                      <span className="font-semibold ml-2">{job.geocoded_addresses}</span>
+                      <span className="text-gray-600">Geocodiert:</span>
+                      <span className="font-semibold ml-2 text-green-600">{job.geocoded_addresses}</span>
                     </div>
                   </div>
                   
@@ -443,7 +454,16 @@ function App() {
                         onClick={() => fetchRoute(job.id)}
                         className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                       >
-                        View Route
+                        Route anzeigen
+                      </button>
+                      <button
+                        onClick={() => {
+                          // Direct Excel download
+                          window.open(`${BACKEND_URL}/api/route/${job.id}/export`, '_blank');
+                        }}
+                        className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                      >
+                        📊 Excel Export
                       </button>
                     </div>
                   )}
