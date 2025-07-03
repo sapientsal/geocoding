@@ -258,10 +258,15 @@ def test_delete_job(job_id):
         return False
     
     try:
+        # Add a small delay to ensure the job is fully processed
+        time.sleep(2)
+        
+        # Try to delete the job
         response = requests.delete(f"{BACKEND_URL}/job/{job_id}")
         
         if response.status_code != 200:
             log_test("Database Operations", f"Failed to delete job. Status code: {response.status_code}", False)
+            print(f"Response: {response.text}")
             return False
         
         # Verify job was deleted by trying to get it
