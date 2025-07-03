@@ -407,16 +407,42 @@ function App() {
             
             {filePreview.preview_addresses && filePreview.preview_addresses.length > 0 && (
               <div className="mb-6">
-                <h3 className="text-lg font-semibold text-gray-700 mb-3">🏠 Beispiel Adressen (kombiniert)</h3>
-                <div className="bg-gray-50 rounded-lg p-4 space-y-2">
-                  {filePreview.preview_addresses.map((address, index) => (
-                    <div key={index} className="flex items-center">
-                      <span className="w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm mr-3">
-                        {index + 1}
-                      </span>
-                      <span className="text-gray-800">{address}</span>
-                    </div>
-                  ))}
+                <h3 className="text-lg font-semibold text-gray-700 mb-3">
+                  🏠 Alle erkannten Adressen ({filePreview.preview_addresses.length} Adressen)
+                </h3>
+                <div className="bg-gray-50 rounded-lg p-4 max-h-96 overflow-y-auto custom-scrollbar">
+                  <div className="space-y-2">
+                    {filePreview.preview_addresses.map((addressObj, index) => (
+                      <div key={index} className="flex items-start bg-white rounded-lg p-3 shadow-sm hover:shadow-md transition-shadow">
+                        <span className="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-semibold mr-3 mt-0.5 flex-shrink-0">
+                          {addressObj.index || index + 1}
+                        </span>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-gray-800 font-medium mb-1">
+                            {addressObj.address || addressObj}
+                          </div>
+                          {addressObj.original_parts && (
+                            <div className="text-xs text-gray-500 grid grid-cols-2 gap-2">
+                              <span>Straße: {addressObj.original_parts.street}</span>
+                              <span>Nr: {addressObj.original_parts.house_number}{addressObj.original_parts.zusatz ? ` ${addressObj.original_parts.zusatz}` : ''}</span>
+                              <span>PLZ: {addressObj.original_parts.plz}</span>
+                              <span>Ort: {addressObj.original_parts.ort}</span>
+                            </div>
+                          )}
+                        </div>
+                        <div className="ml-2 flex-shrink-0">
+                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            ✓ Erkannt
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="mt-3 text-center">
+                  <p className="text-sm text-gray-600">
+                    📊 {filePreview.preview_addresses.length} Adressen werden verarbeitet und geosortiert
+                  </p>
                 </div>
               </div>
             )}
