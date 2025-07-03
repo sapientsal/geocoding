@@ -364,6 +364,82 @@ function App() {
           </div>
         </div>
 
+        {/* File Preview */}
+        {showPreview && filePreview && (
+          <div className="bg-white rounded-lg shadow-lg p-8 mb-8">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-semibold text-gray-800">📋 Datei-Vorschau</h2>
+              <button
+                onClick={() => setShowPreview(false)}
+                className="text-gray-500 hover:text-gray-700 text-2xl"
+              >
+                ×
+              </button>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-6 mb-6">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-700 mb-3">📄 Datei-Informationen</h3>
+                <div className="space-y-2 text-sm">
+                  <div><span className="font-medium">Dateiname:</span> {filePreview.filename}</div>
+                  <div><span className="font-medium">Erkanntes Format:</span> <span className="text-green-600">{filePreview.detected_format}</span></div>
+                  <div><span className="font-medium">Anzahl Spalten:</span> {filePreview.columns.length}</div>
+                </div>
+              </div>
+              
+              <div>
+                <h3 className="text-lg font-semibold text-gray-700 mb-3">🎯 Erkannte Adress-Spalten</h3>
+                <div className="space-y-2 text-sm">
+                  <div><span className="font-medium">Straße:</span> {filePreview.detected_columns.street || 'Nicht erkannt'}</div>
+                  <div><span className="font-medium">Hausnummer:</span> {filePreview.detected_columns.house_number || 'Nicht erkannt'}</div>
+                  <div><span className="font-medium">PLZ:</span> {filePreview.detected_columns.plz || 'Nicht erkannt'}</div>
+                  <div><span className="font-medium">Ort:</span> {filePreview.detected_columns.ort || 'Nicht erkannt'}</div>
+                  {filePreview.detected_columns.zusatz && (
+                    <div><span className="font-medium">Zusatz:</span> {filePreview.detected_columns.zusatz}</div>
+                  )}
+                </div>
+              </div>
+            </div>
+            
+            {filePreview.preview_addresses && filePreview.preview_addresses.length > 0 && (
+              <div className="mb-6">
+                <h3 className="text-lg font-semibold text-gray-700 mb-3">🏠 Beispiel Adressen (kombiniert)</h3>
+                <div className="bg-gray-50 rounded-lg p-4 space-y-2">
+                  {filePreview.preview_addresses.map((address, index) => (
+                    <div key={index} className="flex items-center">
+                      <span className="w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm mr-3">
+                        {index + 1}
+                      </span>
+                      <span className="text-gray-800">{address}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            <div className="flex space-x-4">
+              <button
+                onClick={handleUpload}
+                disabled={!selectedFile || uploading}
+                className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
+              >
+                ✅ Datei verarbeiten ({filePreview.preview_addresses?.length || 0} Adressen)
+              </button>
+              
+              <button
+                onClick={() => {
+                  setSelectedFile(null);
+                  setShowPreview(false);
+                  setFilePreview(null);
+                }}
+                className="px-6 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+              >
+                🔄 Andere Datei wählen
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Current Job Status */}
         {jobStatus && (
           <div className="bg-white rounded-lg shadow-lg p-8 mb-8">
