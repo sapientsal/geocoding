@@ -549,21 +549,30 @@ async def process_upload_job(job_id: str, file_content: bytes, filename: str):
                 # German format: combine separate columns
                 street = str(row[street_col]).strip() if street_col else ""
                 house_num = str(row[house_num_col]).strip() if house_num_col else ""
+                zusatz = str(row[zusatz_col]).strip() if zusatz_col else ""
                 plz = str(row[plz_col]).strip() if plz_col else ""
                 ort = str(row[ort_col]).strip() if ort_col else ""
                 
                 # Skip empty rows
-                if not street or not ort:
+                if not street or not ort or street.lower() == 'nan' or ort.lower() == 'nan':
                     continue
                 
                 # Combine into full address
                 address_parts = []
-                if street:
-                    if house_num and house_num.lower() != 'nan':
-                        address_parts.append(f"{street} {house_num}")
-                    else:
-                        address_parts.append(street)
                 
+                # Street name from "Projektname Strasse" column
+                street_clean = street.replace("Worpswede ", "").strip()
+                
+                # Combine street with house number and zusatz
+                street_part = street_clean
+                if house_num and house_num.lower() != 'nan':
+                    street_part += f" {house_num}"
+                    if zusatz and zusatz.lower() != 'nan':
+                        street_part += f" {zusatz}"
+                
+                address_parts.append(street_part)
+                
+                # Add PLZ and Ort
                 if plz and plz.lower() != 'nan':
                     if ort:
                         address_parts.append(f"{plz} {ort}")
@@ -573,6 +582,7 @@ async def process_upload_job(job_id: str, file_content: bytes, filename: str):
                     address_parts.append(ort)
                 
                 address_text = ", ".join(address_parts)
+                print(f"Combined address: {address_text}")
             else:
                 # Single address column format
                 address_text = str(row[address_column]).strip()
