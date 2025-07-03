@@ -676,6 +676,93 @@ async def process_upload_job(job_id: str, file_content: bytes, filename: str):
             }}
         )
 
+@app.post("/api/preview")
+async def preview_file(file: UploadFile = File(...)):
+    """Preview Excel file structure before processing"""
+    
+    # Validate file type
+    if not file.filename.endswith(('.xlsx', '.xls', '.csv')):
+        raise HTTPException(status_code=400, detail="Only Excel (.xlsx, .xls) and CSV files are supported")
+    
+    try:
+        # Read file content
+        file_content = await file.read()
+        
+        # Parse Excel file (first 10 rows for preview)
+        if file.filename.endswith('.csv'):
+            df = pd.read_csv(BytesIO(file_content), nrows=10)
+        else:
+            df = pd.read_excel(BytesIO(file_content), nrows=10)
+        
+        # Detect columns
+        street_col = None
+        house_num_col = None
+        zusatz_col = None
+        plz_col = None
+        ort_col = None
+        
+        for col in df.columns:
+            col_lower = col.lower().strip()
+            if any(keyword in col_lower for keyword in ['projektname strasse', 'strasse', 'straße', 'street']):
+                street_col = col
+            elif any(keyword in col_lower for keyword in ['hausnummer', 'haus nummer', 'nummer', 'nr']):
+                house_num_col = col
+            elif any(keyword in col_lower for keyword in ['zusatz', 'zusätze']):
+                zusatz_col = col
+            elif any(keyword in col_lower for keyword in ['plz', 'postleitzahl', 'postal']):
+                plz_col = col
+            elif any(keyword in col_lower for keyword in ['ort', 'stadt', 'city', 'location']):
+                ort_col = col
+        
+        has_german_format = street_col and house_num_col and plz_col and ort_col
+        
+        # Generate preview addresses
+        preview_addresses = []
+        for index, row in df.iterrows():
+            if index >= 5:  # Show only first 5 rows
+                break
+                
+            if has_german_format:
+                street = str(row[street_col]).strip() if street_col else ""
+                house_num = str(row[house_num_col]).strip() if house_num_col else ""
+                zusatz = str(row[zusatz_col]).strip() if zusatz_col else ""
+                plz = str(row[plz_col]).strip() if plz_col else ""
+                ort = str(row[ort_col]).strip() if ort_col else ""
+                
+                if street and ort and street.lower() != 'nan' and ort.lower() != 'nan':
+                    street_clean = street.replace("Worpswede ", "").strip()
+                    street_part = street_clean
+                    if house_num and house_num.lower() != 'nan':
+                        street_part += f" {house_num}"
+                        if zusatz and zusatz.lower() != 'nan':
+                            street_part += f" {zusatz}"
+                    
+                    if plz and plz.lower() != 'nan':
+                        combined_address = f"{street_part}, {plz} {ort}"
+                    else:
+                        combined_address = f"{street_part}, {ort}"
+                    
+                    preview_addresses.append(combined_address)
+        
+        return {
+            "filename": file.filename,
+            "total_rows": len(df),
+            "columns": list(df.columns),
+            "detected_format": "German (separate columns)" if has_german_format else "Single address column",
+            "detected_columns": {
+                "street": street_col,
+                "house_number": house_num_col,
+                "zusatz": zusatz_col,
+                "plz": plz_col,
+                "ort": ort_col
+            },
+            "preview_addresses": preview_addresses,
+            "sample_data": df.head(5).to_dict('records')
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"File preview error: {str(e)}")
+
 @app.post("/api/upload")
 async def upload_file(
     background_tasks: BackgroundTasks,
