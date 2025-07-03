@@ -267,10 +267,10 @@ function App() {
             {selectedFile && (
               <div className="mt-4 p-4 bg-gray-50 rounded-lg">
                 <p className="text-sm text-gray-700">
-                  Selected: <span className="font-semibold">{selectedFile.name}</span>
+                  Ausgewählt: <span className="font-semibold">{selectedFile.name}</span>
                 </p>
                 <p className="text-xs text-gray-500 mt-1">
-                  Size: {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
+                  Größe: {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
                 </p>
               </div>
             )}
