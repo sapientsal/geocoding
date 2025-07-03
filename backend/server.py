@@ -194,10 +194,15 @@ def haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> fl
     return c * r
 
 def geocode_address(address: str) -> tuple:
-    """Geocode an address using OpenStreetMap Nominatim API"""
+    """Geocode an address with caching for performance"""
     try:
-        # Add delay to respect rate limits (1 request per second)
-        time.sleep(1)
+        # Check cache first
+        if address in address_cache:
+            cached_result = address_cache[address]
+            return cached_result['lat'], cached_result['lon'], cached_result['formatted'], cached_result['error']
+        
+        # Add reduced delay for better performance (0.5 seconds instead of 1)
+        time.sleep(0.5)
         
         url = "https://nominatim.openstreetmap.org/search"
         params = {
@@ -221,14 +226,32 @@ def geocode_address(address: str) -> tuple:
             lat = float(result['lat'])
             lon = float(result['lon'])
             formatted_address = result.get('display_name', address)
+            
+            # Cache the result
+            address_cache[address] = {
+                'lat': lat,
+                'lon': lon,
+                'formatted': formatted_address,
+                'error': None
+            }
+            
             return lat, lon, formatted_address, None
         else:
-            return None, None, None, f"No results found for address: {address}"
+            error_msg = f"No results found for address: {address}"
+            address_cache[address] = {
+                'lat': None,
+                'lon': None,
+                'formatted': None,
+                'error': error_msg
+            }
+            return None, None, None, error_msg
             
     except requests.exceptions.RequestException as e:
-        return None, None, None, f"Geocoding API error: {str(e)}"
+        error_msg = f"Geocoding API error: {str(e)}"
+        return None, None, None, error_msg
     except Exception as e:
-        return None, None, None, f"Geocoding error: {str(e)}"
+        error_msg = f"Geocoding error: {str(e)}"
+        return None, None, None, error_msg
 
 def optimize_route(addresses: List[Address]) -> List[int]:
     """Optimize route using nearest neighbor algorithm"""
