@@ -224,7 +224,7 @@ function App() {
 
         {/* Upload Section */}
         <div className="bg-white rounded-lg shadow-lg p-8 mb-8">
-          <h2 className="text-2xl font-semibold text-gray-800 mb-6">Upload Address List</h2>
+          <h2 className="text-2xl font-semibold text-gray-800 mb-6">Adressliste hochladen</h2>
           
           <div
             className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
