@@ -550,8 +550,114 @@ async def get_job_status(job_id: str):
     
     return job_data
 
-@app.get("/api/route/{job_id}")
-async def get_route(job_id: str):
+@app.get("/api/route/{job_id}/export")
+async def export_route_excel(job_id: str):
+    """Export optimized route as Excel file"""
+    from fastapi.responses import StreamingResponse
+    
+    # Check if job exists and is completed
+    job = upload_jobs_collection.find_one({"id": job_id})
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    
+    if job["status"] != "completed":
+        raise HTTPException(status_code=400, detail="Job is not completed yet")
+    
+    # Get route and addresses
+    route = routes_collection.find_one({"job_id": job_id})
+    if not route:
+        raise HTTPException(status_code=404, detail="Route not found")
+    
+    addresses = list(addresses_collection.find({"job_id": job_id}))
+    
+    # Create Excel workbook
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Optimized Route"
+    
+    # Define styles
+    header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
+    header_font = Font(color="FFFFFF", bold=True)
+    success_fill = PatternFill(start_color="C6EFCE", end_color="C6EFCE", fill_type="solid")
+    error_fill = PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid")
+    
+    # Headers
+    headers = [
+        "Reihenfolge", "Originaladresse", "Formatierte Adresse", 
+        "Breitengrad", "Längengrad", "Geocodiert", "Status", "Fehler"
+    ]
+    
+    for col, header in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col, value=header)
+        cell.fill = header_fill
+        cell.font = header_font
+    
+    # Create address mapping for optimized order
+    address_map = {addr["id"]: addr for addr in addresses}
+    
+    # Add optimized addresses data
+    for order, addr_index in enumerate(route["optimized_order"], 1):
+        if addr_index < len(addresses):
+            addr = addresses[addr_index]
+            
+            row = order + 1
+            ws.cell(row=row, column=1, value=order)
+            ws.cell(row=row, column=2, value=addr["original_address"])
+            ws.cell(row=row, column=3, value=addr.get("formatted_address", ""))
+            ws.cell(row=row, column=4, value=addr.get("latitude", ""))
+            ws.cell(row=row, column=5, value=addr.get("longitude", ""))
+            ws.cell(row=row, column=6, value="Ja" if addr.get("geocoded") else "Nein")
+            ws.cell(row=row, column=7, value="Erfolgreich" if addr.get("geocoded") else "Fehlgeschlagen")
+            ws.cell(row=row, column=8, value=addr.get("geocoding_error", ""))
+            
+            # Apply styling based on geocoding status
+            if addr.get("geocoded"):
+                for col in range(1, 9):
+                    ws.cell(row=row, column=col).fill = success_fill
+            else:
+                for col in range(1, 9):
+                    ws.cell(row=row, column=col).fill = error_fill
+    
+    # Auto-adjust column widths
+    for column in ws.columns:
+        max_length = 0
+        column_letter = column[0].column_letter
+        for cell in column:
+            try:
+                if len(str(cell.value)) > max_length:
+                    max_length = len(str(cell.value))
+            except:
+                pass
+        adjusted_width = min(max_length + 2, 50)
+        ws.column_dimensions[column_letter].width = adjusted_width
+    
+    # Add summary sheet
+    ws_summary = wb.create_sheet("Zusammenfassung")
+    ws_summary.cell(row=1, column=1, value="Routenoptimierung - Zusammenfassung").font = Font(bold=True, size=14)
+    ws_summary.cell(row=3, column=1, value="Dateiname:").font = Font(bold=True)
+    ws_summary.cell(row=3, column=2, value=job["filename"])
+    ws_summary.cell(row=4, column=1, value="Gesamtanzahl Adressen:").font = Font(bold=True)
+    ws_summary.cell(row=4, column=2, value=job["total_addresses"])
+    ws_summary.cell(row=5, column=1, value="Erfolgreich geocodiert:").font = Font(bold=True)
+    ws_summary.cell(row=5, column=2, value=job["geocoded_addresses"])
+    ws_summary.cell(row=6, column=1, value="Gesamtdistanz:").font = Font(bold=True)
+    ws_summary.cell(row=6, column=2, value=f"{route['total_distance']:.2f} km")
+    ws_summary.cell(row=7, column=1, value="Erstellt am:").font = Font(bold=True)
+    ws_summary.cell(row=7, column=2, value=datetime.now().strftime("%d.%m.%Y %H:%M:%S"))
+    
+    # Save to BytesIO
+    excel_buffer = BytesIO()
+    wb.save(excel_buffer)
+    excel_buffer.seek(0)
+    
+    # Create filename
+    filename = f"optimized_route_{job_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    
+    return StreamingResponse(
+        BytesIO(excel_buffer.getvalue()),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
     """Get optimized route for a job"""
     
     # Check if job exists and is completed
