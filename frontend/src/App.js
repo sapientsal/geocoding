@@ -84,7 +84,10 @@ function App() {
     setDragActive(false);
     
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      setSelectedFile(e.dataTransfer.files[0]);
+      const file = e.dataTransfer.files[0];
+      setSelectedFile(file);
+      // Automatische Vorschau
+      previewFile(file);
     }
   }, []);
 
