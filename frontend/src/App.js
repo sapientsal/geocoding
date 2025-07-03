@@ -352,18 +352,36 @@ function App() {
               
               <div className="grid grid-cols-3 gap-4 text-sm">
                 <div>
-                  <span className="text-gray-600">Total Addresses:</span>
+                  <span className="text-gray-600">Total Adressen:</span>
                   <span className="font-semibold ml-2">{jobStatus.total_addresses}</span>
                 </div>
                 <div>
-                  <span className="text-gray-600">Processed:</span>
+                  <span className="text-gray-600">Verarbeitet:</span>
                   <span className="font-semibold ml-2">{jobStatus.processed_addresses}</span>
                 </div>
                 <div>
-                  <span className="text-gray-600">Geocoded:</span>
+                  <span className="text-gray-600">Geocodiert:</span>
                   <span className="font-semibold ml-2">{jobStatus.geocoded_addresses}</span>
                 </div>
               </div>
+              
+              {getEstimatedTime(jobStatus) && (
+                <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div className="flex items-center">
+                    <svg className="w-5 h-5 text-blue-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span className="text-blue-800 font-medium">
+                      Geschätzte Restzeit: {getEstimatedTime(jobStatus)}
+                    </span>
+                  </div>
+                  {jobStatus.status === 'geocoding' && jobStatus.total_addresses > 1000 && (
+                    <p className="text-blue-700 text-sm mt-2">
+                      💡 Bei großen Listen verwenden wir Caching und optimierte Algorithmen für bessere Performance.
+                    </p>
+                  )}
+                </div>
+              )}
               
               {jobStatus.error_message && (
                 <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
