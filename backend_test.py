@@ -182,6 +182,19 @@ def test_route_optimization(job_id):
         else:
             log_test("Route Optimization Algorithm", f"Route optimization successful. {len(optimized_addresses)} addresses in optimized route. Total distance: {total_distance:.2f} km")
         
+        # Verify geocoding results
+        for addr in optimized_addresses:
+            if addr.get("geocoded", False):
+                original = addr.get("original_address", "")
+                formatted = addr.get("formatted_address", "")
+                lat = addr.get("latitude")
+                lon = addr.get("longitude")
+                
+                if lat and lon and formatted:
+                    log_test("Address Geocoding with OpenStreetMap", 
+                             f"Successfully geocoded: '{original}' → '{formatted}' at coordinates ({lat}, {lon})")
+                    break
+        
         # Verify that the route makes sense (each point should be close to the previous one)
         valid_route = True
         for i in range(len(optimized_addresses) - 1):
