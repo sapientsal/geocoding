@@ -123,8 +123,9 @@ def test_job_status(job_id):
             print(f"Processed: {job_data.get('processed_addresses')}/{job_data.get('total_addresses')}")
             
             # Test geocoding progress
-            if status == "geocoding" and job_data.get("processed_addresses") > 0:
-                log_test("Address Geocoding with OpenStreetMap", f"Geocoding in progress. {job_data.get('geocoded_addresses')} addresses geocoded so far.")
+            if status in ["geocoding", "completed"] and job_data.get("geocoded_addresses", 0) > 0:
+                log_test("Address Geocoding with OpenStreetMap", 
+                         f"Geocoding successful. {job_data.get('geocoded_addresses')} of {job_data.get('total_addresses')} addresses geocoded.")
             
             # Check if job is completed or failed
             if status == "completed":
