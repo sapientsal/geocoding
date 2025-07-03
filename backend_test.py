@@ -425,7 +425,16 @@ def run_all_tests():
         print("\n❌ API health check failed. Aborting tests.")
         return
     
-    # Test file upload
+    # Test German address format processing
+    print("\n" + "=" * 80)
+    print("🇩🇪 Testing German Address Format Processing")
+    print("=" * 80)
+    german_job_id = test_german_address_format()
+    
+    # Test standard file upload
+    print("\n" + "=" * 80)
+    print("🇺🇸 Testing Standard Address Format Processing")
+    print("=" * 80)
     job_id = test_file_upload()
     
     if job_id:
