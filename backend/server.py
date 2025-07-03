@@ -694,6 +694,14 @@ async def preview_file(file: UploadFile = File(...)):
         else:
             df = pd.read_excel(BytesIO(file_content), nrows=10)
         
+        # Clean DataFrame - replace NaN/Infinity values
+        df = df.fillna("")
+        df = df.replace([float('inf'), -float('inf')], "")
+        
+        # Convert all columns to string to avoid JSON serialization issues
+        for col in df.columns:
+            df[col] = df[col].astype(str)
+        
         # Detect columns
         street_col = None
         house_num_col = None
@@ -729,24 +737,35 @@ async def preview_file(file: UploadFile = File(...)):
                 plz = str(row[plz_col]).strip() if plz_col else ""
                 ort = str(row[ort_col]).strip() if ort_col else ""
                 
-                if street and ort and street.lower() != 'nan' and ort.lower() != 'nan':
+                if street and ort and street.lower() not in ['nan', ''] and ort.lower() not in ['nan', '']:
                     street_clean = street.replace("Worpswede ", "").strip()
                     street_part = street_clean
-                    if house_num and house_num.lower() != 'nan':
+                    if house_num and house_num.lower() not in ['nan', '']:
                         street_part += f" {house_num}"
-                        if zusatz and zusatz.lower() != 'nan':
+                        if zusatz and zusatz.lower() not in ['nan', '']:
                             street_part += f" {zusatz}"
                     
-                    if plz and plz.lower() != 'nan':
+                    if plz and plz.lower() not in ['nan', '']:
                         combined_address = f"{street_part}, {plz} {ort}"
                     else:
                         combined_address = f"{street_part}, {ort}"
                     
                     preview_addresses.append(combined_address)
         
+        # Clean sample data for JSON serialization
+        sample_data = df.head(5).to_dict('records')
+        
+        # Ensure all values in sample_data are JSON serializable
+        for record in sample_data:
+            for key, value in record.items():
+                if pd.isna(value) or value in [float('inf'), -float('inf')]:
+                    record[key] = ""
+                else:
+                    record[key] = str(value)
+        
         return {
             "filename": file.filename,
-            "total_rows": len(df),
+            "total_rows": int(len(df)),
             "columns": list(df.columns),
             "detected_format": "German (separate columns)" if has_german_format else "Single address column",
             "detected_columns": {
@@ -757,10 +776,11 @@ async def preview_file(file: UploadFile = File(...)):
                 "ort": ort_col
             },
             "preview_addresses": preview_addresses,
-            "sample_data": df.head(5).to_dict('records')
+            "sample_data": sample_data
         }
         
     except Exception as e:
+        print(f"Preview error: {str(e)}")
         raise HTTPException(status_code=400, detail=f"File preview error: {str(e)}")
 
 @app.post("/api/upload")
