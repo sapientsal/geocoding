@@ -493,26 +493,32 @@ async def process_upload_job(job_id: str, file_content: bytes, filename: str):
             )
             return
         
-        # Detect German address format with separate columns
+        # Detect specific Excel format with German column names
         street_col = None
         house_num_col = None
+        zusatz_col = None
         plz_col = None
         ort_col = None
         
-        # Map German column names to address components
+        # Map specific German column names to address components
         for col in df.columns:
-            col_lower = col.lower()
-            if any(keyword in col_lower for keyword in ['straße', 'strasse', 'street']):
+            col_lower = col.lower().strip()
+            if any(keyword in col_lower for keyword in ['projektname strasse', 'strasse', 'straße', 'street']):
                 street_col = col
-            elif any(keyword in col_lower for keyword in ['hausnummer', 'haus', 'nummer', 'nr']):
+            elif any(keyword in col_lower for keyword in ['hausnummer', 'haus nummer', 'nummer', 'nr']):
                 house_num_col = col
+            elif any(keyword in col_lower for keyword in ['zusatz', 'zusätze']):
+                zusatz_col = col
             elif any(keyword in col_lower for keyword in ['plz', 'postleitzahl', 'postal']):
                 plz_col = col
             elif any(keyword in col_lower for keyword in ['ort', 'stadt', 'city', 'location']):
                 ort_col = col
         
         # Check if we have German format (separate columns)
-        has_german_format = street_col and plz_col and ort_col
+        has_german_format = street_col and house_num_col and plz_col and ort_col
+        
+        print(f"Detected columns: Street={street_col}, House={house_num_col}, PLZ={plz_col}, Ort={ort_col}, Zusatz={zusatz_col}")
+        print(f"German format detected: {has_german_format}")
         
         # Find single address column as fallback
         address_column = None
