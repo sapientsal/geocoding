@@ -11,6 +11,7 @@ function App() {
   const [currentJobId, setCurrentJobId] = useState(null);
   const [jobStatus, setJobStatus] = useState(null);
   const [route, setRoute] = useState(null);
+  const [showRoute, setShowRoute] = useState(false);
   const [filePreview, setFilePreview] = useState(null);
   const [showPreview, setShowPreview] = useState(false);
 
