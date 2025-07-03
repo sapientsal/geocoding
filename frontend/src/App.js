@@ -215,7 +215,10 @@ function App() {
             🚀 Sales Route Optimizer
           </h1>
           <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-            Upload your Excel address list and get an optimized route for efficient sales visits
+            Laden Sie Ihre Excel-Adressliste hoch und erhalten Sie eine optimierte Route für effiziente Vertriebsbesuche
+          </p>
+          <p className="text-sm text-gray-500 mt-2">
+            Unterstützt deutsche Adressformate (Straße, Hausnummer, PLZ, Ort) und internationale Formate
           </p>
         </div>
 
