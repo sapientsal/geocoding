@@ -294,16 +294,39 @@ async def process_upload_job(job_id: str, file_content: bytes, filename: str):
             )
             return
         
-        # Find address column
-        address_column = None
-        for col in df.columns:
-            if any(keyword in col.lower() for keyword in ['address', 'street', 'location', 'addr']):
-                address_column = col
-                break
+        # Detect German address format with separate columns
+        street_col = None
+        house_num_col = None
+        plz_col = None
+        ort_col = None
         
-        if address_column is None:
-            # Use first column if no address column found
-            address_column = df.columns[0]
+        # Map German column names to address components
+        for col in df.columns:
+            col_lower = col.lower()
+            if any(keyword in col_lower for keyword in ['straße', 'strasse', 'street']):
+                street_col = col
+            elif any(keyword in col_lower for keyword in ['hausnummer', 'haus', 'nummer', 'nr']):
+                house_num_col = col
+            elif any(keyword in col_lower for keyword in ['plz', 'postleitzahl', 'postal']):
+                plz_col = col
+            elif any(keyword in col_lower for keyword in ['ort', 'stadt', 'city', 'location']):
+                ort_col = col
+        
+        # Check if we have German format (separate columns)
+        has_german_format = street_col and plz_col and ort_col
+        
+        # Find single address column as fallback
+        address_column = None
+        if not has_german_format:
+            for col in df.columns:
+                col_lower = col.lower()
+                if any(keyword in col_lower for keyword in ['address', 'adresse', 'street', 'location', 'addr']):
+                    address_column = col
+                    break
+            
+            if address_column is None:
+                # Use first column if no address column found
+                address_column = df.columns[0]
         
         addresses = []
         total_addresses = len(df)
