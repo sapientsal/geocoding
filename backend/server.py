@@ -658,6 +658,9 @@ async def export_route_excel(job_id: str):
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": f"attachment; filename={filename}"}
     )
+
+@app.get("/api/route/{job_id}")
+async def get_route(job_id: str):
     """Get optimized route for a job"""
     
     # Check if job exists and is completed
