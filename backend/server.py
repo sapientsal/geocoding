@@ -812,12 +812,9 @@ async def preview_file(file: UploadFile = File(...)):
         
         has_german_format = street_col and house_num_col and plz_col and ort_col
         
-        # Generate preview addresses
+        # Generate preview addresses - show ALL addresses, not just first 5
         preview_addresses = []
         for index, row in df.iterrows():
-            if index >= 5:  # Show only first 5 rows
-                break
-                
             if has_german_format:
                 street = str(row[street_col]).strip() if street_col else ""
                 house_num = str(row[house_num_col]).strip() if house_num_col else ""
@@ -838,7 +835,17 @@ async def preview_file(file: UploadFile = File(...)):
                     else:
                         combined_address = f"{street_part}, {ort}"
                     
-                    preview_addresses.append(combined_address)
+                    preview_addresses.append({
+                        "index": index + 1,
+                        "address": combined_address,
+                        "original_parts": {
+                            "street": street_clean,
+                            "house_number": house_num,
+                            "zusatz": zusatz,
+                            "plz": plz,
+                            "ort": ort
+                        }
+                    })
         
         # Clean sample data for JSON serialization
         sample_data = df.head(5).to_dict('records')
