@@ -283,6 +283,138 @@ def test_delete_job(job_id):
         log_test("Database Operations", f"Job deletion failed with error: {str(e)}", False)
         return False
 
+def test_german_address_format():
+    """Test German address format processing"""
+    print("\n🔍 Testing German Address Format Processing...")
+    
+    try:
+        # Read the sample German addresses file
+        with open('/app/sample_german_addresses.csv', 'r') as f:
+            csv_content = f.read()
+        
+        print(f"Loaded sample German addresses file with the following content:")
+        print(csv_content)
+        
+        # Create file-like object for upload
+        files = {
+            'file': ('sample_german_addresses.csv', csv_content, 'text/csv')
+        }
+        
+        # Upload file
+        response = requests.post(f"{BACKEND_URL}/upload", files=files)
+        
+        if response.status_code == 200:
+            job_id = response.json().get("job_id")
+            log_test("German Address Format Processing", f"German addresses file uploaded successfully. Job ID: {job_id}")
+            
+            # Wait for job to complete
+            max_attempts = 30
+            polling_interval = 5
+            
+            for attempt in range(max_attempts):
+                print(f"Polling job status (attempt {attempt+1}/{max_attempts})...")
+                response = requests.get(f"{BACKEND_URL}/job/{job_id}")
+                
+                if response.status_code != 200:
+                    log_test("German Address Format Processing", f"Failed to get job status. Status code: {response.status_code}", False)
+                    return None
+                
+                job_data = response.json()
+                status = job_data.get("status")
+                
+                print(f"Current job status: {status}")
+                print(f"Processed: {job_data.get('processed_addresses')}/{job_data.get('total_addresses')}")
+                
+                # Check if job is completed or failed
+                if status == "completed":
+                    log_test("German Address Format Processing", f"Job completed successfully. Processed {job_data.get('processed_addresses')} addresses.")
+                    break
+                elif status == "error":
+                    log_test("German Address Format Processing", f"Job failed with error: {job_data.get('error_message')}", False)
+                    return None
+                
+                # Wait before next polling attempt
+                time.sleep(polling_interval)
+            
+            # Get route data to verify German address processing
+            response = requests.get(f"{BACKEND_URL}/route/{job_id}")
+            
+            if response.status_code != 200:
+                log_test("German Address Format Processing", f"Failed to get route. Status code: {response.status_code}", False)
+                return None
+            
+            route_data = response.json()
+            addresses = route_data.get("addresses", [])
+            
+            # Verify that German addresses were properly combined and geocoded
+            if not addresses:
+                log_test("German Address Format Processing", "No addresses found in route data", False)
+                return None
+            
+            # Check for expected combined address format
+            expected_formats = [
+                "Potsdamer Platz 1, 10117 Berlin",
+                "Marienplatz 8, 80331 München",
+                "Königsallee 60, 40212 Düsseldorf"
+            ]
+            
+            found_formats = []
+            for addr in addresses:
+                original = addr.get("original_address", "")
+                formatted = addr.get("formatted_address", "")
+                geocoded = addr.get("geocoded", False)
+                
+                # Check if this is one of our expected formats
+                for expected in expected_formats:
+                    if expected in original:
+                        found_formats.append(expected)
+                        if geocoded:
+                            log_test("German Address Format Processing", 
+                                    f"Successfully processed German address: '{original}' → '{formatted}'")
+                        else:
+                            log_test("German Address Format Processing", 
+                                    f"Failed to geocode German address: '{original}'", False)
+            
+            # Verify that we found at least some of our expected formats
+            if found_formats:
+                log_test("German Address Format Processing", 
+                        f"German address format correctly detected and processed. Found {len(found_formats)} expected formats.")
+                
+                # Test route optimization with German addresses
+                optimized_addresses = route_data.get("optimized_addresses", [])
+                if optimized_addresses:
+                    log_test("German Address Format Processing", 
+                            f"Route optimization successful with German addresses. {len(optimized_addresses)} addresses in optimized route.")
+                else:
+                    log_test("German Address Format Processing", "Route optimization failed with German addresses", False)
+            else:
+                # Check if addresses were combined correctly even if they don't match our expected formats exactly
+                correct_format = False
+                for addr in addresses:
+                    original = addr.get("original_address", "")
+                    # Check for pattern: Street + Number, Postal Code + City
+                    if any(street in original for street in ["Potsdamer Platz", "Marienplatz", "Königsallee"]) and \
+                       any(city in original for city in ["Berlin", "München", "Düsseldorf"]):
+                        correct_format = True
+                        log_test("German Address Format Processing", 
+                                f"Address combined correctly: '{original}'")
+                
+                if correct_format:
+                    log_test("German Address Format Processing", "German addresses combined in correct format but didn't match expected patterns exactly")
+                else:
+                    log_test("German Address Format Processing", "German addresses not combined in expected format", False)
+            
+            # Clean up - delete the job
+            requests.delete(f"{BACKEND_URL}/job/{job_id}")
+            return job_id
+        else:
+            log_test("German Address Format Processing", f"File upload failed with status code: {response.status_code}", False)
+            print(f"Response: {response.text}")
+            return None
+    except Exception as e:
+        log_test("German Address Format Processing", f"German address format testing failed with error: {str(e)}", False)
+        return None
+
 def run_all_tests():
     """Run all tests in sequence"""
     print("\n🚀 Starting Sales Route Optimization Backend API Tests")
