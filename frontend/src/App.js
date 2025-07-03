@@ -88,9 +88,38 @@ function App() {
     }
   }, []);
 
+  const previewFile = async (file) => {
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const response = await fetch(`${BACKEND_URL}/api/preview`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (response.ok) {
+        const preview = await response.json();
+        setFilePreview(preview);
+        setShowPreview(true);
+      } else {
+        const error = await response.json();
+        alert(`Fehler bei der Datei-Vorschau: ${error.detail}`);
+      }
+    } catch (error) {
+      console.error('Error previewing file:', error);
+      alert('Fehler bei der Datei-Vorschau');
+    }
+  };
+
   const handleFileSelect = (e) => {
     if (e.target.files && e.target.files[0]) {
-      setSelectedFile(e.target.files[0]);
+      const file = e.target.files[0];
+      setSelectedFile(file);
+      // Automatische Vorschau
+      previewFile(file);
     }
   };
 
