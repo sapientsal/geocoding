@@ -300,6 +300,110 @@ def calculate_distance_meters(lat1: float, lon1: float, lat2: float, lon2: float
     
     return R * c
 
+async def geocode_address_with_cache(address: str) -> dict:
+    """Geocode an address with caching and retry logic for performance"""
+    try:
+        # Check cache first
+        if address in address_cache:
+            cached_result = address_cache[address]
+            return {
+                'latitude': cached_result['lat'],
+                'longitude': cached_result['lon'],
+                'formatted_address': cached_result['formatted'],
+                'error': cached_result['error']
+            }
+        
+        # Reduced delay for better performance (0.3 seconds instead of 0.5)
+        await asyncio.sleep(0.3)
+        
+        url = "https://nominatim.openstreetmap.org/search"
+        params = {
+            'q': address,
+            'format': 'json',
+            'limit': 1,
+            'addressdetails': 1,
+            'accept-language': 'de,en'  # Prefer German results
+        }
+        
+        headers = {
+            'User-Agent': 'SalesRouteOptimizer/1.0 (Enterprise)',
+            'Accept': 'application/json'
+        }
+        
+        # Retry logic for better reliability
+        max_retries = 2
+        error_msg = None
+        
+        for attempt in range(max_retries + 1):
+            try:
+                response = requests.get(url, params=params, headers=headers, timeout=15)
+                response.raise_for_status()
+                
+                data = response.json()
+                
+                if data:
+                    result = data[0]
+                    lat = float(result['lat'])
+                    lon = float(result['lon'])
+                    formatted_address = result.get('display_name', address)
+                    
+                    # Enhanced cache with metadata
+                    address_cache[address] = {
+                        'lat': lat,
+                        'lon': lon,
+                        'formatted': formatted_address,
+                        'error': None,
+                        'cached_at': datetime.now(),
+                        'source': 'nominatim'
+                    }
+                    
+                    return {
+                        'latitude': lat,
+                        'longitude': lon,
+                        'formatted_address': formatted_address,
+                        'error': None
+                    }
+                else:
+                    error_msg = f"No geocoding results found for: {address}"
+                    break
+                    
+            except requests.exceptions.Timeout:
+                if attempt < max_retries:
+                    await asyncio.sleep(1)  # Wait before retry
+                    continue
+                error_msg = f"Geocoding timeout after {max_retries + 1} attempts: {address}"
+                break
+            except requests.exceptions.RequestException as e:
+                if attempt < max_retries:
+                    await asyncio.sleep(1)
+                    continue
+                error_msg = f"Geocoding API error after {max_retries + 1} attempts: {str(e)}"
+                break
+        
+        # Cache negative results to avoid repeated failed requests
+        address_cache[address] = {
+            'lat': None,
+            'lon': None,
+            'formatted': None,
+            'error': error_msg,
+            'cached_at': datetime.now()
+        }
+        return {
+            'latitude': None,
+            'longitude': None,
+            'formatted_address': None,
+            'error': error_msg
+        }
+            
+    except Exception as e:
+        error_msg = f"Geocoding error: {str(e)}"
+        return {
+            'latitude': None,
+            'longitude': None,
+            'formatted_address': None,
+            'error': error_msg
+        }
+
 def geocode_address_cached(address: str) -> tuple:
     """Geocode an address with caching for performance"""
     try:
