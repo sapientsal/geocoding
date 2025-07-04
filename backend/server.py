@@ -1477,6 +1477,10 @@ async def process_street_sorted_job(job_id: str, file_content: bytes, filename: 
                     numeric, letter = extract_house_number_parts(house_num)
                     working_df.loc[idx, 'house_number_numeric'] = numeric
                     working_df.loc[idx, 'house_number_letter'] = letter
+                    
+                    # Handle letter suffix for sorting (e.g., 10A should come after 10)
+                    if zusatz_col and pd.notna(row[zusatz_col]) and row[zusatz_col]:
+                        working_df.loc[idx, 'house_number_letter'] = str(row[zusatz_col]).strip()
                 except Exception as e:
                     print(f"Error processing house number: {e}")
             
