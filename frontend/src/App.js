@@ -174,11 +174,11 @@ function App() {
       } else {
         const error = await response.json();
         console.error('Preview error:', error); // Debug log
-        alert(`Fehler bei der Datei-Vorschau: ${error.detail}`);
+        handleApiError({ response: { data: error } }, 'Datei-Vorschau');
       }
     } catch (error) {
       console.error('Error previewing file:', error);
-      alert('Fehler bei der Datei-Vorschau');
+      handleApiError(error, 'Datei-Vorschau');
     }
   };
 
