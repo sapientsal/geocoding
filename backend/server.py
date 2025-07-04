@@ -130,6 +130,132 @@ class UploadJob(BaseModel):
     created_at: datetime
     completed_at: Optional[datetime] = None
 
+def extract_house_number_parts(house_number_str) -> Tuple[int, str]:
+    """Extract numeric and alphabetic parts from house number for proper sorting"""
+    if pd.isna(house_number_str) or house_number_str == '':
+        return 0, ''
+    
+    house_str = str(house_number_str).strip()
+    
+    # Use regex to extract number and letter parts
+    match = re.match(r'^(\d+)([A-Za-z]*).*', house_str)
+    if match:
+        number = int(match.group(1))
+        letter = match.group(2).upper() if match.group(2) else ''
+        return number, letter
+    else:
+        # If no number found, try to extract any number
+        numbers = re.findall(r'\d+', house_str)
+        if numbers:
+            return int(numbers[0]), ''
+        else:
+            return 0, house_str
+
+def calculate_distance_meters(lat1: float, lon1: float, lat2: float, lon2: float) -> Optional[float]:
+    """Calculate distance between two points in meters using Haversine formula"""
+    if not all([lat1, lon1, lat2, lon2]):
+        return None
+    
+    # Radius of Earth in meters
+    R = 6371000
+    
+    # Convert to radians
+    lat1_rad = math.radians(lat1)
+    lat2_rad = math.radians(lat2)
+    delta_lat = math.radians(lat2 - lat1)
+    delta_lon = math.radians(lon2 - lon1)
+    
+    # Haversine formula
+    a = (math.sin(delta_lat/2) * math.sin(delta_lat/2) +
+         math.cos(lat1_rad) * math.cos(lat2_rad) *
+         math.sin(delta_lon/2) * math.sin(delta_lon/2))
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
+    
+    return R * c
+
+def sort_addresses_by_street_and_house_number(df, geocoded_data):
+    """
+    Sort addresses geo-based by street and house number numerically.
+    Preserves all original columns exactly.
+    """
+    # Create a working copy with original index to preserve row relationships
+    working_df = df.copy()
+    working_df['original_index'] = working_df.index
+    
+    # Add geocoding data
+    for i, geocoded in enumerate(geocoded_data):
+        if i < len(working_df):
+            working_df.loc[i, 'latitude'] = geocoded.get('latitude')
+            working_df.loc[i, 'longitude'] = geocoded.get('longitude')
+            working_df.loc[i, 'geocoded_address'] = geocoded.get('formatted_address', '')
+            working_df.loc[i, 'street_from_geocoding'] = geocoded.get('street', '')
+    
+    # Detect address columns
+    street_col = None
+    house_num_col = None
+    
+    for col in working_df.columns:
+        col_lower = col.lower().strip()
+        if any(keyword in col_lower for keyword in ['projektname strasse', 'strasse', 'straße', 'street']):
+            street_col = col
+        elif any(keyword in col_lower for keyword in ['hausnummer', 'haus nummer', 'nummer', 'nr']):
+            house_num_col = col
+    
+    if not street_col or not house_num_col:
+        print("Warning: Could not detect street and house number columns for sorting")
+        return df, []
+    
+    # Clean and extract house number parts
+    working_df['house_number_numeric'], working_df['house_number_letter'] = zip(
+        *working_df[house_num_col].apply(extract_house_number_parts)
+    )
+    
+    # Clean street names for grouping
+    working_df['street_clean'] = working_df[street_col].astype(str).str.strip()
+    
+    # Remove project prefixes like "Worpswede " from street names
+    working_df['street_clean'] = working_df['street_clean'].str.replace(r'^[^A-Za-z]*\s+', '', regex=True)
+    
+    # Sort by street name, then house number (numeric), then letter
+    working_df_sorted = working_df.sort_values([
+        'street_clean',
+        'house_number_numeric', 
+        'house_number_letter'
+    ], na_position='last')
+    
+    # Calculate distances to next address
+    distances = []
+    for i in range(len(working_df_sorted)):
+        if i < len(working_df_sorted) - 1:
+            current_row = working_df_sorted.iloc[i]
+            next_row = working_df_sorted.iloc[i + 1]
+            
+            if (current_row['latitude'] is not None and current_row['longitude'] is not None and
+                next_row['latitude'] is not None and next_row['longitude'] is not None):
+                distance = calculate_distance_meters(
+                    current_row['latitude'], current_row['longitude'],
+                    next_row['latitude'], next_row['longitude']
+                )
+                distances.append(round(distance) if distance else None)
+            else:
+                distances.append(None)
+        else:
+            distances.append(None)  # Last address has no next address
+    
+    # Get the original data in the new order but preserve ALL original columns
+    original_indices = working_df_sorted['original_index'].tolist()
+    sorted_df = df.iloc[original_indices].copy()
+    
+    # Add the distance column
+    sorted_df['Entfernung_zur_naechsten_Adresse_m'] = distances
+    
+    # Add geocoding information as additional columns
+    sorted_df['Breitengrad'] = working_df_sorted['latitude'].values
+    sorted_df['Laengengrad'] = working_df_sorted['longitude'].values
+    sorted_df['Geocodierte_Adresse'] = working_df_sorted['geocoded_address'].values
+    
+    return sorted_df, distances
+
 def haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     """Calculate distance between two points in kilometers using Haversine formula"""
     if not all([lat1, lon1, lat2, lon2]):
