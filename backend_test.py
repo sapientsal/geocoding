@@ -445,9 +445,9 @@ def test_street_based_sorting():
             job_id = response.json().get("job_id")
             log_test("Street-Based Sorting", f"File uploaded successfully for street-based sorting. Job ID: {job_id}")
             
-            # Wait for job to start processing
-            max_attempts = 5
-            polling_interval = 2
+            # Wait for job to complete
+            max_attempts = 30
+            polling_interval = 5
             
             for attempt in range(max_attempts):
                 print(f"Polling job status (attempt {attempt+1}/{max_attempts})...")
@@ -463,17 +463,80 @@ def test_street_based_sorting():
                 print(f"Current job status: {status}")
                 print(f"Processed: {job_data.get('processed_addresses')}/{job_data.get('total_addresses')}")
                 
-                # We only need to verify that the job was created and started processing
-                if status in ["parsing", "geocoding", "sorting"]:
-                    log_test("Street-Based Sorting", f"Job is being processed with status: {status}")
+                # Check if job is completed or failed
+                if status == "completed":
+                    log_test("Street-Based Sorting", f"Job completed successfully. Processed {job_data.get('processed_addresses')} addresses.")
                     break
+                elif status == "error":
+                    log_test("Street-Based Sorting", f"Job failed with error: {job_data.get('error_message')}", False)
+                    return None
                 
                 # Wait before next polling attempt
                 time.sleep(polling_interval)
             
-            # Note: We're not testing the full workflow because there's an issue with the implementation
-            # that causes "cannot convert float NaN to integer" errors
-            log_test("Street-Based Sorting", "The /api/upload-street-sorted endpoint successfully accepts files and creates jobs")
+            # Test retrieving the sorted data
+            print("Testing /api/street-sorted/{job_id} endpoint...")
+            response = requests.get(f"{BACKEND_URL}/street-sorted/{job_id}")
+            
+            if response.status_code != 200:
+                log_test("Street-Based Sorting", f"Failed to get street-sorted data. Status code: {response.status_code}", False)
+                print(f"Response: {response.text}")
+            else:
+                sorted_data = response.json()
+                sorted_addresses = sorted_data.get("sorted_addresses", [])
+                
+                if not sorted_addresses:
+                    log_test("Street-Based Sorting", "No sorted addresses found in response", False)
+                else:
+                    log_test("Street-Based Sorting", f"Successfully retrieved {len(sorted_addresses)} sorted addresses")
+                    
+                    # Verify sorting order (Bergstraße should be sorted by house number: 10, 10A, 12, 14)
+                    bergstrasse_addresses = [addr for addr in sorted_addresses 
+                                           if "Bergstraße" in addr.get("original_address", "")]
+                    
+                    if len(bergstrasse_addresses) >= 4:
+                        # Extract house numbers for verification
+                        house_numbers = []
+                        for addr in bergstrasse_addresses:
+                            original_address = addr.get("original_address", "")
+                            # Extract house number from address like "Bergstraße 10, 27726 Worpswede"
+                            parts = original_address.split()
+                            for i, part in enumerate(parts):
+                                if "Bergstraße" in part and i+1 < len(parts):
+                                    house_numbers.append(parts[i+1])
+                                    break
+                        
+                        print(f"Bergstraße house numbers in sorted order: {house_numbers}")
+                        
+                        # Check if house numbers are in correct order (10, 10A, 12, 14)
+                        expected_order = ["10", "10A", "12", "14"]
+                        if all(num in house_numbers for num in expected_order):
+                            log_test("Street-Based Sorting", "House numbers are correctly sorted")
+                        else:
+                            log_test("Street-Based Sorting", f"House numbers are not in expected order. Found: {house_numbers}", False)
+                    
+                    # Verify distance calculations
+                    has_distances = all("distance_to_next" in addr for addr in sorted_addresses[:-1])
+                    if has_distances:
+                        log_test("Street-Based Sorting", "Distance calculations are present for all addresses")
+                    else:
+                        log_test("Street-Based Sorting", "Distance calculations are missing for some addresses", False)
+            
+            # Test Excel export functionality
+            print("Testing /api/street-sorted/{job_id}/export endpoint...")
+            response = requests.get(f"{BACKEND_URL}/street-sorted/{job_id}/export")
+            
+            if response.status_code != 200:
+                log_test("Street-Based Sorting", f"Failed to export Excel file. Status code: {response.status_code}", False)
+                print(f"Response: {response.text}")
+            else:
+                content_type = response.headers.get('Content-Type')
+                content_disposition = response.headers.get('Content-Disposition')
+                
+                if content_type == 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' and 'attachment' in content_disposition:
+                    log_test("Street-Based Sorting", "Excel export functionality works correctly")
+                else:
+                    log_test("Street-Based Sorting", f"Excel export has incorrect headers. Content-Type: {content_type}, Content-Disposition: {content_disposition}", False)
             
             return job_id
         else:
