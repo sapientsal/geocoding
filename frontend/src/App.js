@@ -667,7 +667,26 @@ function App() {
     try {
       const response = await fetch(`${BACKEND_URL}/api/street-sorted/${jobId}`);
       const data = await response.json();
-      setRoute(data);
+      
+      // Transform street-sorted data to be compatible with the existing route display
+      const transformedData = {
+        ...data,
+        optimized_addresses: data.sorted_addresses.map((addr, index) => ({
+          id: addr.id,
+          original_address: addr.original_address,
+          formatted_address: addr.formatted_address,
+          latitude: addr.latitude,
+          longitude: addr.longitude,
+          geocoded: addr.geocoded,
+          distance_to_next: addr.distance_to_next,
+          row_data: addr.row_data,
+          index: index
+        })),
+        job_id: jobId,
+        sorting_type: 'street_based'
+      };
+      
+      setRoute(transformedData);
       setShowRoute(true);
       
       // Calculate distances for street-sorted route
@@ -686,8 +705,8 @@ function App() {
               from: i,
               to: i + 1,
               distance: distance,
-              fromAddress: current.row_data ? Object.values(current.row_data)[0] : 'Adresse',
-              toAddress: next.row_data ? Object.values(next.row_data)[0] : 'Adresse'
+              fromAddress: current.original_address || 'Adresse',
+              toAddress: next.original_address || 'Adresse'
             });
           }
         }
