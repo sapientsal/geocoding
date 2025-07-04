@@ -183,7 +183,24 @@ function App() {
   };
 
   // Komplett neues File Reset System
-  const resetFileSelection = () => {
+  // Enhanced error handling function
+  const handleApiError = (error, context = 'API call') => {
+    console.error(`Error in ${context}:`, error);
+    
+    if (error.response) {
+      // API returned an error response
+      const errorData = error.response.data;
+      const errorMessage = errorData.detail || errorData.message || 'Ein Fehler ist aufgetreten';
+      const errorId = errorData.error_id ? ` (ID: ${errorData.error_id})` : '';
+      alert(`Fehler${errorId}: ${errorMessage}`);
+    } else if (error.request) {
+      // Network error
+      alert('Netzwerkfehler: Keine Verbindung zum Server möglich. Bitte prüfen Sie Ihre Internetverbindung.');
+    } else {
+      // Other error
+      alert(`Unerwarteter Fehler: ${error.message || 'Unbekannter Fehler'}`);
+    }
+  };
     setSelectedFile(null);
     setFilePreview(null);
     setShowPreview(false);
