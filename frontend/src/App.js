@@ -1021,8 +1021,8 @@ function App() {
 
         {/* Erweiterte Route Map Modal */}
         {showMap && route && (
-          <div className={`fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 ${isFullscreen ? 'p-0' : 'p-4'}`}>
-            <div className={`bg-white rounded-lg w-full overflow-hidden ${isFullscreen ? 'h-full max-w-full max-h-full' : 'max-w-7xl max-h-[95vh]'}`}>
+          <div className={`fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 ${isFullscreen ? 'p-0' : 'p-4'}`}>
+            <div className={`bg-white rounded-lg w-full overflow-hidden ${isFullscreen ? 'h-full max-w-full max-h-full rounded-none' : 'max-w-7xl max-h-[95vh] shadow-2xl'}`}>
               <div className="p-4 border-b border-gray-200 flex justify-between items-center bg-gradient-to-r from-blue-600 to-purple-600 text-white">
                 <div className="flex items-center space-x-4">
                   <h2 className="text-xl font-semibold">🗺️ Optimierte Route - Erweiterte Kartenansicht</h2>
@@ -1035,7 +1035,7 @@ function App() {
                 <div className="flex items-center space-x-2">
                   <button
                     onClick={handleFullscreen}
-                    className="text-white hover:text-gray-200 p-2 rounded-lg hover:bg-white hover:bg-opacity-10 transition-colors"
+                    className="text-white hover:text-gray-200 p-2 rounded-lg hover:bg-white hover:bg-opacity-10 transition-all duration-300"
                     title={isFullscreen ? 'Fenstermodus' : 'Vollbild'}
                   >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1047,8 +1047,11 @@ function App() {
                     </svg>
                   </button>
                   <button
-                    onClick={() => setShowMap(false)}
-                    className="text-white hover:text-gray-200 text-2xl p-2 rounded-lg hover:bg-white hover:bg-opacity-10 transition-colors"
+                    onClick={() => {
+                      setShowMap(false);
+                      setIsFullscreen(false);
+                    }}
+                    className="text-white hover:text-gray-200 text-2xl p-2 rounded-lg hover:bg-white hover:bg-opacity-10 transition-all duration-300"
                   >
                     ×
                   </button>
@@ -1057,7 +1060,7 @@ function App() {
               
               <div className="flex h-full">
                 {/* Haupt-Kartenbereich */}
-                <div className={`${isFullscreen ? 'w-4/5' : 'w-3/4'} relative`}>
+                <div className={`${isFullscreen ? 'w-4/5' : 'w-3/4'} relative bg-gray-100`}>
                   <div className={`${isFullscreen ? 'h-screen' : 'h-[75vh]'} relative`}>
                     {route.optimized_addresses && route.optimized_addresses.length > 0 && (
                       <MapContainer
@@ -1069,7 +1072,10 @@ function App() {
                         zoom={13}
                         style={{ height: '100%', width: '100%' }}
                         className="enhanced-map"
-                        zoomControl={false}
+                        zoomControl={true}
+                        scrollWheelZoom={true}
+                        doubleClickZoom={true}
+                        dragging={true}
                       >
                         <TileLayer
                           url={getTileLayerUrl(currentMapLayer)}
@@ -1078,14 +1084,6 @@ function App() {
                         
                         {/* Automatische Kartenanpassung */}
                         <MapFitBounds addresses={route.optimized_addresses} />
-                        
-                        {/* Erweiterte Kartensteuerung */}
-                        <MapControls 
-                          onFullscreen={handleFullscreen}
-                          onResetView={handleResetView}
-                          onLayerChange={handleLayerChange}
-                          currentLayer={currentMapLayer}
-                        />
                         
                         {/* Erweiterte Marker für alle Adressen */}
                         {route.optimized_addresses.map((address, index) => {
@@ -1100,11 +1098,13 @@ function App() {
                               position={[address.latitude, address.longitude]}
                               icon={createEnhancedNumberedIcon(index + 1, isStart, isEnd)}
                             >
-                              <Popup maxWidth={300} className="enhanced-popup">
-                                <div className="p-3">
+                              <Popup maxWidth={320} className="enhanced-popup">
+                                <div className="p-4">
                                   <div className="flex items-center mb-3">
-                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-white text-sm mr-3 ${
-                                      isStart ? 'bg-green-500' : isEnd ? 'bg-red-500' : 'bg-blue-500'
+                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-white text-sm mr-3 shadow-lg ${
+                                      isStart ? 'bg-gradient-to-r from-green-500 to-green-600' : 
+                                      isEnd ? 'bg-gradient-to-r from-red-500 to-red-600' : 
+                                      'bg-gradient-to-r from-blue-500 to-blue-600'
                                     }`}>
                                       {index + 1}
                                     </div>
@@ -1113,40 +1113,61 @@ function App() {
                                     </div>
                                   </div>
                                   
-                                  <div className="space-y-2 text-sm">
-                                    <div>
-                                      <div className="font-semibold text-gray-800">
+                                  <div className="space-y-3 text-sm">
+                                    <div className="bg-gray-50 rounded-lg p-3">
+                                      <div className="font-semibold text-gray-800 mb-1">
                                         {address.original_address}
                                       </div>
                                       {address.formatted_address && (
-                                        <div className="text-gray-600 mt-1">
-                                          {address.formatted_address}
+                                        <div className="text-gray-600 text-xs">
+                                          📍 {address.formatted_address}
                                         </div>
                                       )}
                                     </div>
                                     
-                                    <div className="border-t pt-2">
-                                      <div className="text-xs text-gray-500">
-                                        <div>📍 Lat: {address.latitude.toFixed(6)}</div>
-                                        <div>📍 Lng: {address.longitude.toFixed(6)}</div>
+                                    <div className="grid grid-cols-2 gap-2 text-xs">
+                                      <div className="bg-blue-50 rounded p-2">
+                                        <div className="text-blue-700 font-medium">Breitengrad</div>
+                                        <div className="text-blue-900">{address.latitude.toFixed(6)}</div>
+                                      </div>
+                                      <div className="bg-blue-50 rounded p-2">
+                                        <div className="text-blue-700 font-medium">Längengrad</div>
+                                        <div className="text-blue-900">{address.longitude.toFixed(6)}</div>
                                       </div>
                                     </div>
                                     
                                     {/* Distanz-Informationen */}
                                     {routeDistances.length > 0 && (
-                                      <div className="border-t pt-2">
+                                      <div className="border-t pt-3">
                                         {routeDistances.find(d => d.from === index) && (
-                                          <div className="text-xs text-blue-600">
-                                            📏 Nächster Stopp: {routeDistances.find(d => d.from === index).distance.toFixed(2)} km
+                                          <div className="flex items-center text-xs text-green-600 bg-green-50 rounded p-2 mb-1">
+                                            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                                            </svg>
+                                            Zum nächsten Stopp: <span className="font-bold ml-1">{routeDistances.find(d => d.from === index).distance.toFixed(2)} km</span>
                                           </div>
                                         )}
-                                        {routeDistances.find(d => d.to === index) && (
-                                          <div className="text-xs text-gray-500">
-                                            📏 Vorheriger Stopp: {routeDistances.find(d => d.to === index).distance.toFixed(2)} km
+                                        {routeDistances.find(d => d.to === index) && index > 0 && (
+                                          <div className="flex items-center text-xs text-gray-500 bg-gray-50 rounded p-2">
+                                            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 17l-5-5m0 0l5-5m-5 5h12" />
+                                            </svg>
+                                            Vom vorherigen Stopp: <span className="font-medium ml-1">{routeDistances.find(d => d.to === index).distance.toFixed(2)} km</span>
                                           </div>
                                         )}
                                       </div>
                                     )}
+                                    
+                                    {/* Status Badge */}
+                                    <div className="flex justify-end">
+                                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                        address.geocoded
+                                          ? 'bg-green-100 text-green-700'
+                                          : 'bg-red-100 text-red-700'
+                                      }`}>
+                                        {address.geocoded ? '✅ Erfolgreich geocodiert' : '⚠️ Geocodierung fehlgeschlagen'}
+                                      </span>
+                                    </div>
                                   </div>
                                 </div>
                               </Popup>
@@ -1161,84 +1182,77 @@ function App() {
                               .filter(addr => addr.latitude && addr.longitude)
                               .map(addr => [addr.latitude, addr.longitude])}
                             color="#3b82f6"
-                            weight={6}
-                            opacity={0.8}
-                            dashArray="5, 10"
+                            weight={5}
+                            opacity={0.9}
+                            dashArray="10, 5"
                             className="animated-route"
                           />
                         )}
                       </MapContainer>
                     )}
-                  </div>
-                </div>
-                
-                {/* Erweiterte Seitenleiste */}
-                <div className={`${isFullscreen ? 'w-1/5' : 'w-1/4'} bg-gray-50 border-l border-gray-200 overflow-y-auto`}>
-                  <div className="p-4 space-y-6">
-                    {/* Statistiken */}
-                    <div className="bg-white rounded-xl p-4 shadow-sm">
-                      <h3 className="font-semibold text-gray-800 mb-4 flex items-center">
-                        <svg className="w-5 h-5 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                        </svg>
-                        Route-Statistiken
-                      </h3>
-                      <div className="space-y-3">
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm text-gray-600">Gesamtdistanz</span>
-                          <span className="font-semibold text-blue-600">{formatDistance(route.total_distance)}</span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm text-gray-600">Anzahl Stopps</span>
-                          <span className="font-semibold text-green-600">{route.optimized_addresses.length}</span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm text-gray-600">Algorithmus</span>
-                          <span className="font-semibold text-purple-600 text-xs">2-opt optimiert</span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm text-gray-600">Geschätzte Fahrzeit</span>
-                          <span className="font-semibold text-orange-600 text-xs">
-                            ~{Math.round(route.total_distance * 1.5)} min
-                          </span>
-                        </div>
-                      </div>
-                    </div>
                     
-                    {/* Kartensteuerung */}
-                    <div className="bg-white rounded-xl p-4 shadow-sm">
-                      <h3 className="font-semibold text-gray-800 mb-4 flex items-center">
-                        <svg className="w-5 h-5 mr-2 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-1.447-.894L15 4m0 13V4m0 0L9 7" />
-                        </svg>
-                        Kartensteuerung
-                      </h3>
-                      <div className="space-y-3">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Kartenansicht
-                          </label>
+                    {/* Floating Map Controls */}
+                    <div className="absolute top-4 right-4 z-1000">
+                      <div className="bg-white bg-opacity-95 backdrop-blur-sm rounded-xl shadow-lg p-3 space-y-3">
+                        <div className="flex flex-col space-y-2">
+                          <button
+                            onClick={handleResetView}
+                            className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-medium transition-all duration-300 shadow-md hover:shadow-lg"
+                            title="Ansicht zurücksetzen"
+                          >
+                            <svg className="w-4 h-4 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                            </svg>
+                          </button>
                           <select
                             value={currentMapLayer}
                             onChange={(e) => handleLayerChange(e.target.value)}
-                            className="w-full p-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            className="px-2 py-1 border border-gray-300 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+                            title="Kartenansicht wählen"
                           >
                             <option value="standard">🗺️ Standard</option>
                             <option value="satellite">🛰️ Satellit</option>
                             <option value="terrain">🏔️ Terrain</option>
                           </select>
                         </div>
-                        <button
-                          onClick={handleResetView}
-                          className="w-full p-2 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-lg text-sm font-medium transition-colors"
-                        >
-                          🔄 Ansicht zurücksetzen
-                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Erweiterte Seitenleiste */}
+                <div className={`${isFullscreen ? 'w-1/5' : 'w-1/4'} bg-gradient-to-b from-gray-50 to-gray-100 border-l border-gray-200 overflow-y-auto custom-scrollbar`}>
+                  <div className="p-4 space-y-4">
+                    {/* Statistiken */}
+                    <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+                      <h3 className="font-semibold text-gray-800 mb-4 flex items-center">
+                        <svg className="w-5 h-5 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                        </svg>
+                        Route-Statistiken
+                      </h3>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="bg-blue-50 rounded-lg p-3 text-center">
+                          <div className="text-2xl font-bold text-blue-600">{formatDistance(route.total_distance)}</div>
+                          <div className="text-xs text-blue-700">Gesamtdistanz</div>
+                        </div>
+                        <div className="bg-green-50 rounded-lg p-3 text-center">
+                          <div className="text-2xl font-bold text-green-600">{route.optimized_addresses.length}</div>
+                          <div className="text-xs text-green-700">Stopps</div>
+                        </div>
+                        <div className="bg-purple-50 rounded-lg p-3 text-center">
+                          <div className="text-sm font-bold text-purple-600">2-opt</div>
+                          <div className="text-xs text-purple-700">Algorithmus</div>
+                        </div>
+                        <div className="bg-orange-50 rounded-lg p-3 text-center">
+                          <div className="text-sm font-bold text-orange-600">~{Math.round(route.total_distance * 1.5)} min</div>
+                          <div className="text-xs text-orange-700">Fahrzeit</div>
+                        </div>
                       </div>
                     </div>
                     
                     {/* Route-Reihenfolge */}
-                    <div className="bg-white rounded-xl p-4 shadow-sm">
+                    <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
                       <h3 className="font-semibold text-gray-800 mb-4 flex items-center">
                         <svg className="w-5 h-5 mr-2 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
@@ -1246,7 +1260,7 @@ function App() {
                         </svg>
                         Route-Reihenfolge
                       </h3>
-                      <div className="space-y-2 max-h-96 overflow-y-auto">
+                      <div className="space-y-2 max-h-80 overflow-y-auto custom-scrollbar">
                         {route.optimized_addresses.map((address, index) => {
                           const isStart = index === 0;
                           const isEnd = index === route.optimized_addresses.length - 1;
@@ -1256,33 +1270,36 @@ function App() {
                             <div
                               key={address.id}
                               className={`p-3 rounded-lg border-l-4 text-sm transition-all hover:shadow-md cursor-pointer ${
-                                isStart ? 'bg-green-50 border-green-500 hover:bg-green-100' :
-                                isEnd ? 'bg-red-50 border-red-500 hover:bg-red-100' :
-                                'bg-blue-50 border-blue-500 hover:bg-blue-100'
+                                isStart ? 'bg-gradient-to-r from-green-50 to-green-100 border-green-500 hover:from-green-100 hover:to-green-200' :
+                                isEnd ? 'bg-gradient-to-r from-red-50 to-red-100 border-red-500 hover:from-red-100 hover:to-red-200' :
+                                'bg-gradient-to-r from-blue-50 to-blue-100 border-blue-500 hover:from-blue-100 hover:to-blue-200'
                               }`}
                             >
                               <div className="flex items-center justify-between">
                                 <div className="flex items-center">
-                                  <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white mr-3 ${
-                                    isStart ? 'bg-green-500' :
-                                    isEnd ? 'bg-red-500' :
-                                    'bg-blue-500'
+                                  <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white mr-3 shadow-md ${
+                                    isStart ? 'bg-gradient-to-r from-green-500 to-green-600' :
+                                    isEnd ? 'bg-gradient-to-r from-red-500 to-red-600' :
+                                    'bg-gradient-to-r from-blue-500 to-blue-600'
                                   }`}>
                                     {index + 1}
                                   </span>
                                   <div className="min-w-0 flex-1">
-                                    <div className="font-medium text-gray-800 truncate">
+                                    <div className="font-medium text-gray-800 truncate mb-1">
                                       {address.original_address}
                                     </div>
                                     {routeDistance && (
-                                      <div className="text-xs text-gray-500">
-                                        📏 {routeDistance.distance.toFixed(2)} km zum nächsten Stopp
+                                      <div className="text-xs text-gray-600 flex items-center">
+                                        <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                                        </svg>
+                                        {routeDistance.distance.toFixed(2)} km
                                       </div>
                                     )}
                                   </div>
                                 </div>
                                 {!address.geocoded && (
-                                  <div className="text-xs text-red-600 font-medium">
+                                  <div className="text-xs text-red-600 font-bold">
                                     ⚠️
                                   </div>
                                 )}
@@ -1294,26 +1311,72 @@ function App() {
                     </div>
                     
                     {/* Aktionen */}
-                    <div className="bg-white rounded-xl p-4 shadow-sm">
+                    <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
                       <h3 className="font-semibold text-gray-800 mb-4 flex items-center">
                         <svg className="w-5 h-5 mr-2 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4" />
                         </svg>
                         Aktionen
                       </h3>
-                      <div className="space-y-2">
+                      <div className="space-y-3">
                         <button
                           onClick={() => downloadExcel(route.job_id)}
-                          className="w-full p-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium transition-colors"
+                          className="w-full p-3 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white rounded-lg text-sm font-medium transition-all duration-300 shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
                         >
-                          📊 Excel exportieren
+                          <div className="flex items-center justify-center">
+                            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                            Excel exportieren
+                          </div>
                         </button>
                         <button
                           onClick={() => setShowRoute(true)}
-                          className="w-full p-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
+                          className="w-full p-3 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-lg text-sm font-medium transition-all duration-300 shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
                         >
-                          📋 Detailliste anzeigen
+                          <div className="flex items-center justify-center">
+                            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                            Detailliste anzeigen
+                          </div>
                         </button>
+                      </div>
+                    </div>
+                    
+                    {/* Legende */}
+                    <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+                      <h3 className="font-semibold text-gray-800 mb-3 flex items-center">
+                        <svg className="w-5 h-5 mr-2 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        Legende
+                      </h3>
+                      <div className="space-y-2 text-xs">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center">
+                            <div className="w-4 h-4 bg-gradient-to-r from-green-500 to-green-600 rounded-full mr-2"></div>
+                            <span>Start</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center">
+                            <div className="w-4 h-4 bg-gradient-to-r from-blue-500 to-blue-600 rounded-full mr-2"></div>
+                            <span>Zwischenstopps</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center">
+                            <div className="w-4 h-4 bg-gradient-to-r from-red-500 to-red-600 rounded-full mr-2"></div>
+                            <span>Ziel</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center">
+                            <div className="w-6 h-1 bg-blue-500 mr-2"></div>
+                            <span>Optimierte Route</span>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>
