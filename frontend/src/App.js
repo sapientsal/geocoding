@@ -1089,9 +1089,18 @@ function App() {
                 <div key={job.id} className="border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow">
                   <div className="flex justify-between items-start mb-4">
                     <div>
-                      <h3 className="text-lg font-semibold text-gray-800">{job.filename}</h3>
+                      <h3 className="text-lg font-semibold text-gray-800 flex items-center">
+                        {job.sorting_type === 'street_based' ? (
+                          <>📍 {job.filename}</>
+                        ) : (
+                          <>🚀 {job.filename}</>
+                        )}
+                      </h3>
                       <p className="text-sm text-gray-500">
                         Hochgeladen: {new Date(job.created_at).toLocaleDateString('de-DE')}
+                      </p>
+                      <p className="text-xs text-blue-600 font-medium">
+                        {job.sorting_type === 'street_based' ? 'Straßen-sortiert' : 'Route-optimiert'}
                       </p>
                       {job.status === 'completed' && job.completed_at && (
                         <p className="text-sm text-green-600">
