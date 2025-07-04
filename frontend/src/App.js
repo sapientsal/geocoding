@@ -828,10 +828,13 @@ function App() {
               className={`px-8 py-3 rounded-lg font-semibold transition-colors ${
                 !selectedFile || uploadStatus !== 'idle'
                   ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                  : 'bg-green-600 text-white hover:bg-green-700'
+                  : sortingMode === 'street_sorting'
+                    ? 'bg-green-600 text-white hover:bg-green-700'
+                    : 'bg-blue-600 text-white hover:bg-blue-700'
               }`}
             >
-              {uploadStatus === 'uploading' ? 'Hochladen...' : 'Hochladen & Verarbeiten'}
+              {uploadStatus === 'uploading' ? 'Hochladen...' : 
+               sortingMode === 'street_sorting' ? '📍 Straßen-sortiert hochladen' : '🚀 Route-optimiert hochladen'}
             </button>
           </div>
         </div>
