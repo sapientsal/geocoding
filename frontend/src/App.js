@@ -684,6 +684,15 @@ function App() {
                       </button>
                       <button
                         onClick={() => {
+                          fetchRoute(job.id);
+                          setShowMap(true);
+                        }}
+                        className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+                      >
+                        🗺️ Karte
+                      </button>
+                      <button
+                        onClick={() => {
                           // Direct Excel download
                           window.open(`${BACKEND_URL}/api/route/${job.id}/export`, '_blank');
                         }}
