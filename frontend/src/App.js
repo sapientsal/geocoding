@@ -513,15 +513,15 @@ function App() {
             <div className="flex space-x-4">
               <button
                 onClick={() => {
-                  // Sofortige UI-Reaktion
+                  // SOFORTIGE UI-Reaktion ohne Verzögerung
                   setUploading(true);
                   setShowPreview(false);
                   setFilePreview(null);
                   
-                  // Upload in der nächsten Event-Loop-Iteration
-                  setTimeout(() => {
+                  // Erzwinge sofortiges Re-Rendering
+                  requestAnimationFrame(() => {
                     handleUpload();
-                  }, 10);
+                  });
                 }}
                 disabled={!selectedFile || uploading}
                 className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 flex items-center"
