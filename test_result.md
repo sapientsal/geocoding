@@ -198,6 +198,21 @@ backend:
         agent: "testing"
         comment: "Tested with the exact format from the user's Excel file. The system correctly processes the 'Projektname Strasse' column by removing the 'Worpswede ' prefix, combines it with 'Hausnummer' and 'Zusatz', and adds 'PLZ' and 'Ort' to create properly formatted addresses like 'Am Hörenberg 8, 27726 Worpswede'. While not all addresses were successfully geocoded by the OpenStreetMap API, this is not a failure of our implementation but rather a limitation of the geocoding service."
 
+  - task: "Street-Based Sorting"
+    implemented: true
+    working: false
+    file: "server.py"
+    stuck_count: 1
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Implemented street-based sorting functionality with house number sorting and distance calculation"
+      - working: false
+        agent: "testing"
+        comment: "The /api/upload-street-sorted endpoint successfully accepts files and creates jobs, but the sorting process fails with 'cannot convert float NaN to integer' error. This is likely happening in the extract_house_number_parts function when it tries to convert a NaN value to an integer. The implementation needs to be fixed to handle NaN values properly."
+
 frontend:
   - task: "File Upload Interface"
     implemented: true
@@ -259,7 +274,8 @@ test_plan:
     - "Real-time Progress Monitoring"
     - "Route Visualization"
     - "Upload History Management"
-  stuck_tasks: []
+  stuck_tasks: 
+    - "Street-Based Sorting"
   test_all: false
   test_priority: "high_first"
 
@@ -276,3 +292,5 @@ agent_communication:
     message: "Starting implementation of enhanced map visualization features for better user experience. Will implement automatic map fitting, improved markers, fullscreen mode, distance display, and multiple map layers to make the route visualization more user-friendly and professional."
   - agent: "main"
     message: "Successfully enhanced map visualization with professional design, multiple map layers (Standard, Satellite, Terrain), improved sidebar with route statistics, interactive controls, and better user experience. Now implementing geo-sorted street-based address sorting with distance calculation and preservation of all original Excel columns."
+  - agent: "testing"
+    message: "Tested the street-based sorting functionality. The /api/upload-street-sorted endpoint successfully accepts files and creates jobs, but the sorting process fails with 'cannot convert float NaN to integer' error. This is likely happening in the extract_house_number_parts function when it tries to convert a NaN value to an integer. The implementation needs to be fixed to handle NaN values properly. The other endpoints (/api/street-sorted/{job_id} and /api/street-sorted/{job_id}/export) could not be fully tested due to this issue."
