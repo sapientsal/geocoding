@@ -1129,6 +1129,126 @@ async def preview_file(file: UploadFile = File(...)):
         print(f"Preview error: {str(e)}")
         raise HTTPException(status_code=400, detail=f"File preview error: {str(e)}")
 
+async def process_street_sorted_job(job_id: str, file_content: bytes, filename: str):
+    """Background task to process uploaded file with street-based sorting"""
+    try:
+        # Update job status
+        upload_jobs_collection.update_one(
+            {"id": job_id},
+            {"$set": {"status": "parsing"}}
+        )
+        
+        # Parse Excel file with better error handling
+        try:
+            if filename.endswith('.csv'):
+                df = pd.read_csv(BytesIO(file_content), encoding='utf-8')
+            else:
+                # Try multiple engines for Excel files
+                try:
+                    df = pd.read_excel(BytesIO(file_content), engine='openpyxl')
+                except Exception:
+                    df = pd.read_excel(BytesIO(file_content), engine='xlrd')
+        except UnicodeDecodeError:
+            # Try different encodings for CSV
+            for encoding in ['latin-1', 'iso-8859-1', 'cp1252']:
+                try:
+                    df = pd.read_csv(BytesIO(file_content), encoding=encoding)
+                    break
+                except:
+                    continue
+            else:
+                raise ValueError("Datei-Encoding konnte nicht erkannt werden. Bitte speichern Sie die Datei als UTF-8.")
+        except Exception as e:
+            upload_jobs_collection.update_one(
+                {"id": job_id},
+                {"$set": {"status": "error", "error_message": f"Datei konnte nicht gelesen werden: {str(e)}"}}
+            )
+            return
+        
+        # Get total number of addresses
+        total_addresses = len(df)
+        
+        # Update job with total count
+        upload_jobs_collection.update_one(
+            {"id": job_id},
+            {"$set": {"total_addresses": total_addresses, "status": "geocoding"}}
+        )
+        
+        # Geocode addresses
+        geocoded_data = []
+        for index, row in df.iterrows():
+            # Build address from all columns
+            address_parts = []
+            for col in df.columns:
+                value = str(row[col]).strip()
+                if value and value.lower() != 'nan':
+                    address_parts.append(value)
+            
+            address_text = ", ".join(address_parts)
+            
+            # Geocode address
+            geocoded = await geocode_address_with_cache(address_text)
+            geocoded_data.append(geocoded)
+            
+            # Update progress
+            upload_jobs_collection.update_one(
+                {"id": job_id},
+                {"$set": {
+                    "processed_addresses": index + 1,
+                    "geocoded_addresses": sum(1 for g in geocoded_data if g.get('latitude') is not None)
+                }}
+            )
+        
+        # Sort addresses by street and house number
+        sorted_df, distances = sort_addresses_by_street_and_house_number(df, geocoded_data)
+        
+        # Prepare sorted addresses with all data
+        sorted_addresses = []
+        for index, row in sorted_df.iterrows():
+            address_data = {
+                'row_data': row.to_dict(),
+                'geocoded': geocoded_data[index].get('latitude') is not None,
+                'latitude': geocoded_data[index].get('latitude'),
+                'longitude': geocoded_data[index].get('longitude'),
+                'formatted_address': geocoded_data[index].get('formatted_address'),
+                'distance_to_next': distances[index] if index < len(distances) else None
+            }
+            sorted_addresses.append(address_data)
+        
+        # Calculate total distance
+        total_distance = sum(d for d in distances if d is not None)
+        
+        # Save route
+        route = {
+            "id": str(uuid.uuid4()),
+            "job_id": job_id,
+            "sorted_addresses": sorted_addresses,
+            "total_distance": total_distance,
+            "created_at": datetime.now(),
+            "sorting_type": "street_based"
+        }
+        
+        routes_collection.insert_one(route)
+        
+        # Update job as completed
+        upload_jobs_collection.update_one(
+            {"id": job_id},
+            {"$set": {
+                "status": "completed",
+                "completed_at": datetime.now()
+            }}
+        )
+        
+    except Exception as e:
+        # Update job with error
+        upload_jobs_collection.update_one(
+            {"id": job_id},
+            {"$set": {
+                "status": "error",
+                "error_message": str(e)
+            }}
+        )
+
 @app.post("/api/upload")
 async def upload_file(
     background_tasks: BackgroundTasks,
