@@ -190,7 +190,7 @@ function App() {
     try {
       const response = await fetch(`${BACKEND_URL}/api/jobs`);
       const data = await response.json();
-      setJobs(data.jobs);
+      setJobs(data); // Backend returns array directly now
     } catch (error) {
       console.error('Error fetching jobs:', error);
     }
