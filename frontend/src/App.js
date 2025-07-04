@@ -515,7 +515,7 @@ function App() {
               <button
                 onClick={() => {
                   // SOFORTIGE UI-Reaktion ohne Verzögerung
-                  setUploading(true);
+                  setUploadStatus('uploading');
                   setShowPreview(false);
                   setFilePreview(null);
                   
