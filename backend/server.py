@@ -2,7 +2,7 @@ from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, JSONResponse
 from pymongo import MongoClient
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Tuple
 from pydantic import BaseModel
 from datetime import datetime
 from io import BytesIO
@@ -14,6 +14,7 @@ import uuid
 import os
 import json
 import asyncio
+import re
 from concurrent.futures import ThreadPoolExecutor
 import openpyxl
 from openpyxl.styles import PatternFill, Font
