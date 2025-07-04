@@ -165,6 +165,13 @@ function App() {
   const handleFileSelect = (e) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
+      
+      // Reset alle states vor neuer Preview
+      setUploadStatus('idle');
+      setUploadProgress(0);
+      setShowPreview(false);
+      setFilePreview(null);
+      
       setSelectedFile(file);
       // Automatische Vorschau
       previewFile(file);
