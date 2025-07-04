@@ -1539,9 +1539,27 @@ async def get_street_sorted_route(job_id: str):
         # Convert MongoDB ObjectId to string
         route_data["_id"] = str(route_data["_id"])
         
-        return route_data
+        # Handle NaN and infinity values for JSON serialization
+        def clean_for_json(obj):
+            if isinstance(obj, dict):
+                return {k: clean_for_json(v) for k, v in obj.items()}
+            elif isinstance(obj, list):
+                return [clean_for_json(item) for item in obj]
+            elif isinstance(obj, float):
+                # Replace NaN and infinity with None
+                if math.isnan(obj) or math.isinf(obj):
+                    return None
+                return obj
+            else:
+                return obj
+        
+        # Clean the data for JSON serialization
+        cleaned_data = clean_for_json(route_data)
+        
+        return cleaned_data
         
     except Exception as e:
+        print(f"Error fetching street-sorted route: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error fetching street-sorted route: {str(e)}")
 
 @app.post("/api/upload")
