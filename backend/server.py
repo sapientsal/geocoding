@@ -161,61 +161,83 @@ def geocode_address_cached(address: str) -> tuple:
         error_msg = f"Geocoding error: {str(e)}"
         return None, None, None, error_msg
 def geocode_address(address: str) -> tuple:
-    """Geocode an address with caching for performance"""
+    """Geocode an address with caching and retry logic for performance"""
     try:
         # Check cache first
         if address in address_cache:
             cached_result = address_cache[address]
             return cached_result['lat'], cached_result['lon'], cached_result['formatted'], cached_result['error']
         
-        # Add reduced delay for better performance (0.5 seconds instead of 1)
-        time.sleep(0.5)
+        # Reduced delay for better performance (0.3 seconds instead of 0.5)
+        time.sleep(0.3)
         
         url = "https://nominatim.openstreetmap.org/search"
         params = {
             'q': address,
             'format': 'json',
             'limit': 1,
-            'addressdetails': 1
+            'addressdetails': 1,
+            'accept-language': 'de,en'  # Prefer German results
         }
         
         headers = {
-            'User-Agent': 'SalesRouteOptimizer/1.0'
+            'User-Agent': 'SalesRouteOptimizer/1.0 (Enterprise)',
+            'Accept': 'application/json'
         }
         
-        response = requests.get(url, params=params, headers=headers, timeout=10)
-        response.raise_for_status()
+        # Retry logic for better reliability
+        max_retries = 2
+        for attempt in range(max_retries + 1):
+            try:
+                response = requests.get(url, params=params, headers=headers, timeout=15)
+                response.raise_for_status()
+                
+                data = response.json()
+                
+                if data:
+                    result = data[0]
+                    lat = float(result['lat'])
+                    lon = float(result['lon'])
+                    formatted_address = result.get('display_name', address)
+                    
+                    # Enhanced cache with metadata
+                    address_cache[address] = {
+                        'lat': lat,
+                        'lon': lon,
+                        'formatted': formatted_address,
+                        'error': None,
+                        'cached_at': datetime.now(),
+                        'source': 'nominatim'
+                    }
+                    
+                    return lat, lon, formatted_address, None
+                else:
+                    error_msg = f"No geocoding results found for: {address}"
+                    break
+                    
+            except requests.exceptions.Timeout:
+                if attempt < max_retries:
+                    time.sleep(1)  # Wait before retry
+                    continue
+                error_msg = f"Geocoding timeout after {max_retries + 1} attempts: {address}"
+                break
+            except requests.exceptions.RequestException as e:
+                if attempt < max_retries:
+                    time.sleep(1)
+                    continue
+                error_msg = f"Geocoding API error after {max_retries + 1} attempts: {str(e)}"
+                break
         
-        data = response.json()
-        
-        if data:
-            result = data[0]
-            lat = float(result['lat'])
-            lon = float(result['lon'])
-            formatted_address = result.get('display_name', address)
-            
-            # Cache the result
-            address_cache[address] = {
-                'lat': lat,
-                'lon': lon,
-                'formatted': formatted_address,
-                'error': None
-            }
-            
-            return lat, lon, formatted_address, None
-        else:
-            error_msg = f"No results found for address: {address}"
-            address_cache[address] = {
-                'lat': None,
-                'lon': None,
-                'formatted': None,
-                'error': error_msg
-            }
-            return None, None, None, error_msg
-            
-    except requests.exceptions.RequestException as e:
-        error_msg = f"Geocoding API error: {str(e)}"
+        # Cache negative results to avoid repeated failed requests
+        address_cache[address] = {
+            'lat': None,
+            'lon': None,
+            'formatted': None,
+            'error': error_msg,
+            'cached_at': datetime.now()
+        }
         return None, None, None, error_msg
+            
     except Exception as e:
         error_msg = f"Geocoding error: {str(e)}"
         return None, None, None, error_msg
