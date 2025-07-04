@@ -175,19 +175,43 @@ function App() {
     }
   };
 
+  // Komplett neues File Reset System
+  const resetFileSelection = () => {
+    setSelectedFile(null);
+    setFilePreview(null);
+    setShowPreview(false);
+    setUploadStatus('idle');
+    setUploadProgress(0);
+    
+    // File Input komplett zurücksetzen
+    const fileInput = document.getElementById('file-input');
+    if (fileInput) {
+      fileInput.value = '';
+      fileInput.type = 'text';
+      fileInput.type = 'file';
+    }
+  };
+
   const handleFileSelect = (e) => {
+    console.log('File select triggered:', e.target.files); // Debug log
+    
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
       
-      // Reset alle states vor neuer Preview
+      console.log('New file selected:', file.name); // Debug log
+      
+      // Komplett zurücksetzen vor neuer Datei
       setUploadStatus('idle');
       setUploadProgress(0);
       setShowPreview(false);
       setFilePreview(null);
       
       setSelectedFile(file);
-      // Automatische Vorschau
-      previewFile(file);
+      
+      // Etwas Verzögerung für UI-Update
+      setTimeout(() => {
+        previewFile(file);
+      }, 100);
     }
   };
 
