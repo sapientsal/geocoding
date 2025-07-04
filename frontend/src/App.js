@@ -50,6 +50,7 @@ function App() {
   const [route, setRoute] = useState(null);
   const [showRoute, setShowRoute] = useState(false);
   const [filePreview, setFilePreview] = useState(null);
+  const [showPreview, setShowPreview] = useState(false);
   const [showMap, setShowMap] = useState(false);
 
   // Fetch jobs on component mount
