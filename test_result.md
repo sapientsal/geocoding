@@ -200,11 +200,11 @@ backend:
 
   - task: "Street-Based Sorting"
     implemented: true
-    working: true
+    working: false
     file: "server.py"
     stuck_count: 0
     priority: "high"
-    needs_retesting: false
+    needs_retesting: true
     status_history:
       - working: "NA"
         agent: "main"
@@ -215,6 +215,9 @@ backend:
       - working: true
         agent: "testing"
         comment: "Fixed the NaN handling issues in extract_house_number_parts function and improved JSON serialization for the /api/street-sorted/{job_id} endpoint. The street-based sorting functionality now works correctly. All addresses are properly sorted, distance calculations work correctly, and the Excel export functionality is working as expected."
+      - working: false
+        agent: "testing"
+        comment: "Tested with a mixed address file containing addresses from multiple streets in random order. The street-based sorting is not working as expected. Addresses are not being properly grouped by street name, and house numbers within each street are not being sorted correctly. The test shows that addresses from the same street (e.g., 'Am Hörenberg', 'Bergstraße', 'Auf der Heide') are scattered throughout the sorted list rather than being grouped together. Additionally, house numbers within streets are not in correct numerical order (e.g., Bergstraße house numbers appear as [10.1, 10, 12, 14] instead of [10, 10.1, 12, 14])."
 
 frontend:
   - task: "File Upload Interface"
