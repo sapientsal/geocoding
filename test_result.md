@@ -200,11 +200,11 @@ backend:
 
   - task: "Street-Based Sorting"
     implemented: true
-    working: false
+    working: true
     file: "server.py"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: "NA"
         agent: "main"
@@ -218,6 +218,9 @@ backend:
       - working: false
         agent: "testing"
         comment: "Tested with a mixed address file containing addresses from multiple streets in random order. The street-based sorting is not working as expected. Addresses are not being properly grouped by street name, and house numbers within each street are not being sorted correctly. The test shows that addresses from the same street (e.g., 'Am Hörenberg', 'Bergstraße', 'Auf der Heide') are scattered throughout the sorted list rather than being grouped together. Additionally, house numbers within streets are not in correct numerical order (e.g., Bergstraße house numbers appear as [10.1, 10, 12, 14] instead of [10, 10.1, 12, 14])."
+      - working: true
+        agent: "testing"
+        comment: "Fixed the street-based sorting functionality by completely rewriting the process_street_sorted_job function. The new implementation properly groups addresses by street name and sorts house numbers correctly within each street group. The test now shows that all streets are properly grouped together (Bergstraße, Hembergerstraße, Am Hörenberg, Auf der Heide) and house numbers within each street are sorted numerically (e.g., Bergstraße 10, 10A, 12, 14). Distance calculations are working correctly, and the Excel export functionality is also working as expected."
 
 frontend:
   - task: "File Upload Interface"
