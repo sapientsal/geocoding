@@ -86,9 +86,15 @@ function App() {
       const data = await response.json();
       setJobStatus(data);
 
-      if (data.status === 'completed') {
+      if (data.status === 'completed' || data.status === 'error') {
+        // Stop polling wenn Job fertig ist
         setCurrentJobId(null);
         fetchJobs();
+        
+        // Clear job status nach kurzer Zeit um UI sauber zu halten
+        setTimeout(() => {
+          setJobStatus(null);
+        }, 5000); // Zeige Completion-Status 5 Sekunden lang
       }
     } catch (error) {
       console.error('Error fetching job status:', error);
