@@ -146,6 +146,10 @@ function App() {
   const previewFile = async (file) => {
     if (!file) return;
 
+    // Sofort Preview-Loading-State setzen
+    setShowPreview(false);
+    setFilePreview(null);
+
     const formData = new FormData();
     formData.append('file', file);
 
@@ -157,10 +161,12 @@ function App() {
 
       if (response.ok) {
         const preview = await response.json();
+        console.log('Preview received:', preview); // Debug log
         setFilePreview(preview);
         setShowPreview(true);
       } else {
         const error = await response.json();
+        console.error('Preview error:', error); // Debug log
         alert(`Fehler bei der Datei-Vorschau: ${error.detail}`);
       }
     } catch (error) {
