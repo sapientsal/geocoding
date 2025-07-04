@@ -432,8 +432,59 @@ function App() {
     setFilePreview(null);
     setUploadProgress(0);
     
-    // Upload-Prozess starten
-    performUpload();
+    // Upload-Prozess basierend auf Sortier-Modus starten
+    if (sortingMode === 'street_sorting') {
+      performStreetSortingUpload();
+    } else {
+      performUpload();
+    }
+  };
+
+  const performStreetSortingUpload = async () => {
+    const formData = new FormData();
+    formData.append('file', selectedFile);
+
+    try {
+      setUploadProgress(10);
+      
+      const response = await fetch(`${BACKEND_URL}/api/upload-street-sorted`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      setUploadProgress(50);
+
+      const data = await response.json();
+      
+      if (response.ok) {
+        setUploadProgress(80);
+        setCurrentJobId(data.job_id);
+        setUploadProgress(100);
+        
+        // Nach erfolgreichem Upload Status zurücksetzen
+        setTimeout(() => {
+          setUploadStatus('idle');
+          setUploadProgress(0);
+          // Reset file selection und preview states für nächsten Upload
+          setSelectedFile(null);
+          setFilePreview(null);
+          setShowPreview(false);
+        }, 1000);
+        
+        fetchJobs();
+      } else {
+        alert(`Upload fehlgeschlagen: ${data.detail}`);
+        setUploadStatus('idle');
+        setShowPreview(true);
+        setUploadProgress(0);
+      }
+    } catch (error) {
+      console.error('Error uploading file for street sorting:', error);
+      alert('Fehler beim Upload der Datei für Straßen-Sortierung');
+      setUploadStatus('idle');
+      setShowPreview(true);
+      setUploadProgress(0);
+    }
   };
 
   const performUpload = async () => {
