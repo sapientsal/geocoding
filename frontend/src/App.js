@@ -622,7 +622,13 @@ function App() {
 
   const downloadExcel = async (jobId) => {
     try {
-      const response = await fetch(`${BACKEND_URL}/api/route/${jobId}/export`);
+      // Determine the correct endpoint based on job type
+      const job = jobs.find(j => j.id === jobId);
+      const endpoint = job?.sorting_type === 'street_based' 
+        ? `${BACKEND_URL}/api/street-sorted/${jobId}/export`
+        : `${BACKEND_URL}/api/route/${jobId}/export`;
+      
+      const response = await fetch(endpoint);
       
       if (response.ok) {
         const blob = await response.blob();
@@ -632,7 +638,9 @@ function App() {
         
         // Get filename from response headers or create default
         const contentDisposition = response.headers.get('Content-Disposition');
-        let filename = `optimized_route_${jobId}.xlsx`;
+        let filename = job?.sorting_type === 'street_based' 
+          ? `straßen_sortiert_${jobId}.xlsx`
+          : `optimized_route_${jobId}.xlsx`;
         
         if (contentDisposition) {
           const filenameMatch = contentDisposition.match(/filename="?([^"]*)"?/);
@@ -652,6 +660,42 @@ function App() {
     } catch (error) {
       console.error('Error downloading Excel:', error);
       alert('Fehler beim Excel-Export');
+    }
+  };
+
+  const fetchStreetSortedRoute = async (jobId) => {
+    try {
+      const response = await fetch(`${BACKEND_URL}/api/street-sorted/${jobId}`);
+      const data = await response.json();
+      setRoute(data);
+      setShowRoute(true);
+      
+      // Calculate distances for street-sorted route
+      if (data.sorted_addresses && data.sorted_addresses.length > 1) {
+        const distances = [];
+        for (let i = 0; i < data.sorted_addresses.length - 1; i++) {
+          const current = data.sorted_addresses[i];
+          const next = data.sorted_addresses[i + 1];
+          
+          if (current.latitude && current.longitude && next.latitude && next.longitude) {
+            const distance = calculateDistance(
+              current.latitude, current.longitude,
+              next.latitude, next.longitude
+            );
+            distances.push({
+              from: i,
+              to: i + 1,
+              distance: distance,
+              fromAddress: current.row_data ? Object.values(current.row_data)[0] : 'Adresse',
+              toAddress: next.row_data ? Object.values(next.row_data)[0] : 'Adresse'
+            });
+          }
+        }
+        setRouteDistances(distances);
+      }
+    } catch (error) {
+      console.error('Error fetching street-sorted route:', error);
+      alert('Error fetching street-sorted route data');
     }
   };
 
