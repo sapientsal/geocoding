@@ -43,7 +43,8 @@ const createNumberedIcon = (number, isStart = false, isEnd = false) => {
 function App() {
   const [jobs, setJobs] = useState([]);
   const [selectedFile, setSelectedFile] = useState(null);
-  const [uploading, setUploading] = useState(false);
+  const [uploadStatus, setUploadStatus] = useState('idle'); // 'idle', 'uploading', 'processing'
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [dragActive, setDragActive] = useState(false);
   const [currentJobId, setCurrentJobId] = useState(null);
   const [jobStatus, setJobStatus] = useState(null);
