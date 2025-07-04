@@ -418,7 +418,7 @@ function App() {
           
           <div className="flex justify-center mt-6">
             <button
-              onClick={handleUpload}
+              onClick={handleInstantUpload}
               disabled={!selectedFile || uploadStatus !== 'idle'}
               className={`px-8 py-3 rounded-lg font-semibold transition-colors ${
                 !selectedFile || uploadStatus !== 'idle'
