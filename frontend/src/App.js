@@ -164,6 +164,10 @@ function App() {
   const [filePreview, setFilePreview] = useState(null);
   const [showPreview, setShowPreview] = useState(false);
   const [showMap, setShowMap] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [currentMapLayer, setCurrentMapLayer] = useState('standard');
+  const [routeDistances, setRouteDistances] = useState([]);
+  const mapRef = useRef(null);
 
   // Fetch jobs on component mount
   useEffect(() => {
