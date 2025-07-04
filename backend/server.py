@@ -209,12 +209,48 @@ def sort_addresses_by_street_and_house_number(df, geocoded_data):
     
     if not street_col or not house_num_col:
         print("Warning: Could not detect street and house number columns for sorting")
-        return df, []
+        # Return original DataFrame with distance calculations
+        distances = []
+        for i in range(len(df)):
+            if i < len(df) - 1:
+                try:
+                    current_lat = working_df.loc[i, 'latitude'] 
+                    current_lon = working_df.loc[i, 'longitude']
+                    next_lat = working_df.loc[i+1, 'latitude']
+                    next_lon = working_df.loc[i+1, 'longitude']
+                    
+                    if (current_lat is not None and current_lon is not None and
+                        next_lat is not None and next_lon is not None):
+                        distance = calculate_distance_meters(current_lat, current_lon, next_lat, next_lon)
+                        distances.append(round(distance) if distance else None)
+                    else:
+                        distances.append(None)
+                except:
+                    distances.append(None)
+            else:
+                distances.append(None)
+        
+        # Add distance column to original df
+        result_df = df.copy()
+        result_df['Entfernung_zur_naechsten_Adresse_m'] = distances
+        result_df['Breitengrad'] = [geocoded_data[i].get('latitude') if i < len(geocoded_data) else None for i in range(len(result_df))]
+        result_df['Laengengrad'] = [geocoded_data[i].get('longitude') if i < len(geocoded_data) else None for i in range(len(result_df))]
+        result_df['Geocodierte_Adresse'] = [geocoded_data[i].get('formatted_address', '') if i < len(geocoded_data) else '' for i in range(len(result_df))]
+        
+        return result_df, distances
     
-    # Clean and extract house number parts
-    working_df['house_number_numeric'], working_df['house_number_letter'] = zip(
-        *working_df[house_num_col].apply(extract_house_number_parts)
-    )
+    # Clean and extract house number parts with proper error handling
+    house_number_data = []
+    for idx, value in working_df[house_num_col].items():
+        try:
+            numeric, letter = extract_house_number_parts(value)
+            house_number_data.append((numeric, letter))
+        except Exception as e:
+            print(f"Error processing house number '{value}': {e}")
+            house_number_data.append((0, ''))
+    
+    working_df['house_number_numeric'] = [data[0] for data in house_number_data]
+    working_df['house_number_letter'] = [data[1] for data in house_number_data]
     
     # Clean street names for grouping
     working_df['street_clean'] = working_df[street_col].astype(str).str.strip()
@@ -222,43 +258,65 @@ def sort_addresses_by_street_and_house_number(df, geocoded_data):
     # Remove project prefixes like "Worpswede " from street names
     working_df['street_clean'] = working_df['street_clean'].str.replace(r'^[^A-Za-z]*\s+', '', regex=True)
     
+    # Fill NaN values for sorting
+    working_df['street_clean'] = working_df['street_clean'].fillna('')
+    working_df['house_number_numeric'] = working_df['house_number_numeric'].fillna(0)
+    working_df['house_number_letter'] = working_df['house_number_letter'].fillna('')
+    
     # Sort by street name, then house number (numeric), then letter
-    working_df_sorted = working_df.sort_values([
-        'street_clean',
-        'house_number_numeric', 
-        'house_number_letter'
-    ], na_position='last')
+    try:
+        working_df_sorted = working_df.sort_values([
+            'street_clean',
+            'house_number_numeric', 
+            'house_number_letter'
+        ], na_position='last')
+    except Exception as e:
+        print(f"Error during sorting: {e}")
+        # Fallback to original order
+        working_df_sorted = working_df
     
     # Calculate distances to next address
     distances = []
     for i in range(len(working_df_sorted)):
         if i < len(working_df_sorted) - 1:
-            current_row = working_df_sorted.iloc[i]
-            next_row = working_df_sorted.iloc[i + 1]
-            
-            if (current_row['latitude'] is not None and current_row['longitude'] is not None and
-                next_row['latitude'] is not None and next_row['longitude'] is not None):
-                distance = calculate_distance_meters(
-                    current_row['latitude'], current_row['longitude'],
-                    next_row['latitude'], next_row['longitude']
-                )
-                distances.append(round(distance) if distance else None)
-            else:
+            try:
+                current_row = working_df_sorted.iloc[i]
+                next_row = working_df_sorted.iloc[i + 1]
+                
+                current_lat = current_row.get('latitude')
+                current_lon = current_row.get('longitude')
+                next_lat = next_row.get('latitude')
+                next_lon = next_row.get('longitude')
+                
+                if (current_lat is not None and current_lon is not None and
+                    next_lat is not None and next_lon is not None and
+                    not pd.isna(current_lat) and not pd.isna(current_lon) and
+                    not pd.isna(next_lat) and not pd.isna(next_lon)):
+                    distance = calculate_distance_meters(current_lat, current_lon, next_lat, next_lon)
+                    distances.append(round(distance) if distance else None)
+                else:
+                    distances.append(None)
+            except Exception as e:
+                print(f"Error calculating distance for row {i}: {e}")
                 distances.append(None)
         else:
             distances.append(None)  # Last address has no next address
     
     # Get the original data in the new order but preserve ALL original columns
-    original_indices = working_df_sorted['original_index'].tolist()
-    sorted_df = df.iloc[original_indices].copy()
+    try:
+        original_indices = working_df_sorted['original_index'].tolist()
+        sorted_df = df.iloc[original_indices].copy()
+    except Exception as e:
+        print(f"Error reordering original data: {e}")
+        sorted_df = df.copy()
     
     # Add the distance column
     sorted_df['Entfernung_zur_naechsten_Adresse_m'] = distances
     
     # Add geocoding information as additional columns
-    sorted_df['Breitengrad'] = working_df_sorted['latitude'].values
-    sorted_df['Laengengrad'] = working_df_sorted['longitude'].values
-    sorted_df['Geocodierte_Adresse'] = working_df_sorted['geocoded_address'].values
+    sorted_df['Breitengrad'] = working_df_sorted['latitude'].values if 'latitude' in working_df_sorted.columns else [None] * len(sorted_df)
+    sorted_df['Laengengrad'] = working_df_sorted['longitude'].values if 'longitude' in working_df_sorted.columns else [None] * len(sorted_df)
+    sorted_df['Geocodierte_Adresse'] = working_df_sorted['geocoded_address'].values if 'geocoded_address' in working_df_sorted.columns else [''] * len(sorted_df)
     
     return sorted_df, distances
 
