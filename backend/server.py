@@ -959,37 +959,20 @@ async def export_route_excel(job_id: str):
     
     addresses = list(addresses_collection.find({"job_id": job_id}))
     
-    # Read the original file to get all columns
+    # Create Excel workbook with original data structure
     try:
-        # We need to reconstruct the original data with the optimized order
-        # First, let's create the ordered data
-        optimized_data = []
-        
-        # Get ordered addresses based on optimized route
-        for order_index, addr_index in enumerate(route["optimized_order"]):
-            if addr_index < len(addresses):
-                addr = addresses[addr_index]
-                optimized_data.append({
-                    "Neue_Reihenfolge": order_index + 1,
-                    "Original_Index": addr_index + 1,
-                    "Originaladresse": addr["original_address"],
-                    "Formatierte_Adresse": addr.get("formatted_address", ""),
-                    "Breitengrad": addr.get("latitude", ""),
-                    "Längengrad": addr.get("longitude", ""),
-                    "Geocodiert": "Ja" if addr.get("geocoded") else "Nein",
-                    "Geocoding_Status": "Erfolgreich" if addr.get("geocoded") else "Fehlgeschlagen",
-                    "Geocoding_Fehler": addr.get("geocoding_error", ""),
-                    "Job_ID": job_id
-                })
-        
-        # Create Excel workbook
         wb = openpyxl.Workbook()
         
         # Remove default sheet
         wb.remove(wb.active)
         
-        # Create optimized route sheet
-        ws_route = wb.create_sheet("Optimierte Route")
+        # Get original column structure from first address
+        original_columns = []
+        if addresses and addresses[0].get("original_row_data"):
+            original_columns = list(addresses[0]["original_row_data"].keys())
+        
+        # Create optimized route sheet with ALL original columns
+        ws_route = wb.create_sheet("Geosortierte Route")
         
         # Define styles
         header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
@@ -997,10 +980,9 @@ async def export_route_excel(job_id: str):
         success_fill = PatternFill(start_color="C6EFCE", end_color="C6EFCE", fill_type="solid")
         error_fill = PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid")
         
-        # Headers for optimized route
-        route_headers = [
-            "Neue Reihenfolge", "Original Index", "Originaladresse", "Formatierte Adresse", 
-            "Breitengrad", "Längengrad", "Geocodiert", "Status", "Fehler"
+        # Headers: New order column + ALL original columns + geocoding info
+        route_headers = ["Neue_Reihenfolge"] + original_columns + [
+            "Formatierte_Adresse", "Breitengrad", "Längengrad", "Geocodiert", "Geocoding_Fehler"
         ]
         
         # Write headers
@@ -1009,22 +991,33 @@ async def export_route_excel(job_id: str):
             cell.fill = header_fill
             cell.font = header_font
         
-        # Write optimized data
-        for row_idx, data in enumerate(optimized_data, 2):
-            ws_route.cell(row=row_idx, column=1, value=data["Neue_Reihenfolge"])
-            ws_route.cell(row=row_idx, column=2, value=data["Original_Index"])
-            ws_route.cell(row=row_idx, column=3, value=data["Originaladresse"])
-            ws_route.cell(row=row_idx, column=4, value=data["Formatierte_Adresse"])
-            ws_route.cell(row=row_idx, column=5, value=data["Breitengrad"])
-            ws_route.cell(row=row_idx, column=6, value=data["Längengrad"])
-            ws_route.cell(row=row_idx, column=7, value=data["Geocodiert"])
-            ws_route.cell(row=row_idx, column=8, value=data["Geocoding_Status"])
-            ws_route.cell(row=row_idx, column=9, value=data["Geocoding_Fehler"])
-            
-            # Apply styling based on geocoding status
-            fill_color = success_fill if data["Geocodiert"] == "Ja" else error_fill
-            for col in range(1, 10):
-                ws_route.cell(row=row_idx, column=col).fill = fill_color
+        # Write optimized data with ALL original columns
+        for order_index, addr_index in enumerate(route["optimized_order"]):
+            if addr_index < len(addresses):
+                addr = addresses[addr_index]
+                row_idx = order_index + 2
+                
+                # New order number
+                ws_route.cell(row=row_idx, column=1, value=order_index + 1)
+                
+                # ALL original Excel columns
+                if addr.get("original_row_data"):
+                    for col_idx, col_name in enumerate(original_columns, 2):
+                        original_value = addr["original_row_data"].get(col_name, "")
+                        ws_route.cell(row=row_idx, column=col_idx, value=original_value)
+                
+                # Geocoding information
+                geo_start_col = len(original_columns) + 2
+                ws_route.cell(row=row_idx, column=geo_start_col, value=addr.get("formatted_address", ""))
+                ws_route.cell(row=row_idx, column=geo_start_col + 1, value=addr.get("latitude", ""))
+                ws_route.cell(row=row_idx, column=geo_start_col + 2, value=addr.get("longitude", ""))
+                ws_route.cell(row=row_idx, column=geo_start_col + 3, value="Ja" if addr.get("geocoded") else "Nein")
+                ws_route.cell(row=row_idx, column=geo_start_col + 4, value=addr.get("geocoding_error", ""))
+                
+                # Apply styling based on geocoding status
+                fill_color = success_fill if addr.get("geocoded") else error_fill
+                for col in range(1, len(route_headers) + 1):
+                    ws_route.cell(row=row_idx, column=col).fill = fill_color
         
         # Auto-adjust column widths
         for column in ws_route.columns:
