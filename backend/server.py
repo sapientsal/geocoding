@@ -132,7 +132,7 @@ class UploadJob(BaseModel):
 
 def extract_house_number_parts(house_number_str) -> Tuple[int, str]:
     """Extract numeric and alphabetic parts from house number for proper sorting"""
-    if pd.isna(house_number_str) or house_number_str == '':
+    if pd.isna(house_number_str) or house_number_str == '' or str(house_number_str).strip() == '' or str(house_number_str).strip().lower() == 'nan':
         return 0, ''
     
     house_str = str(house_number_str).strip()
@@ -140,14 +140,20 @@ def extract_house_number_parts(house_number_str) -> Tuple[int, str]:
     # Use regex to extract number and letter parts
     match = re.match(r'^(\d+)([A-Za-z]*).*', house_str)
     if match:
-        number = int(match.group(1))
-        letter = match.group(2).upper() if match.group(2) else ''
-        return number, letter
+        try:
+            number = int(match.group(1))
+            letter = match.group(2).upper() if match.group(2) else ''
+            return number, letter
+        except ValueError:
+            return 0, house_str
     else:
         # If no number found, try to extract any number
         numbers = re.findall(r'\d+', house_str)
         if numbers:
-            return int(numbers[0]), ''
+            try:
+                return int(numbers[0]), ''
+            except ValueError:
+                return 0, house_str
         else:
             return 0, house_str
 
