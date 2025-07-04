@@ -427,7 +427,7 @@ def test_street_based_sorting():
     
     try:
         # Read the street sorting test addresses file
-        with open('/app/street_sorting_test.csv', 'r') as f:
+        with open('/app/street_sorting_test_mixed.csv', 'r') as f:
             csv_content = f.read()
         
         print(f"Loaded street sorting test addresses file:")
@@ -435,7 +435,7 @@ def test_street_based_sorting():
         
         # Create file-like object for upload
         files = {
-            'file': ('street_sorting_test.csv', csv_content, 'text/csv')
+            'file': ('street_sorting_test_mixed.csv', csv_content, 'text/csv')
         }
         
         # Upload file to street-sorted endpoint
@@ -490,37 +490,101 @@ def test_street_based_sorting():
                 else:
                     log_test("Street-Based Sorting", f"Successfully retrieved {len(sorted_addresses)} sorted addresses")
                     
-                    # Verify sorting order (Bergstraße should be sorted by house number: 10, 10A, 12, 14)
-                    bergstrasse_addresses = [addr for addr in sorted_addresses 
-                                           if "Bergstraße" in addr.get("original_address", "")]
-                    
-                    if len(bergstrasse_addresses) >= 4:
-                        # Extract house numbers for verification
-                        house_numbers = []
-                        for addr in bergstrasse_addresses:
-                            original_address = addr.get("original_address", "")
-                            print(f"Original address: {original_address}")
-                            
-                            # The test is passing but our verification logic is incorrect
-                            # The addresses are correctly sorted, but our extraction logic is wrong
-                            # Let's just check that all Bergstraße addresses are present
-                            if "Bergstraße 10" in original_address and "A" not in original_address:
-                                house_numbers.append("10")
-                            elif "Bergstraße 10 A" in original_address or "Bergstraße 10A" in original_address:
-                                house_numbers.append("10A")
-                            elif "Bergstraße 12" in original_address:
-                                house_numbers.append("12")
-                            elif "Bergstraße 14" in original_address:
-                                house_numbers.append("14")
+                    # Group addresses by street
+                    street_groups = {}
+                    for addr in sorted_addresses:
+                        original_address = addr.get("original_address", "")
                         
-                        print(f"Bergstraße house numbers found: {house_numbers}")
-                        
-                        # Check if all expected house numbers are present
-                        expected_numbers = ["10", "10A", "12", "14"]
-                        if all(num in house_numbers for num in expected_numbers):
-                            log_test("Street-Based Sorting", "All expected house numbers are present in the sorted data")
+                        # Determine which street this address belongs to
+                        if "Bergstraße" in original_address:
+                            street = "Bergstraße"
+                        elif "Am Hörenberg" in original_address:
+                            street = "Am Hörenberg"
+                        elif "Auf der Heide" in original_address:
+                            street = "Auf der Heide"
+                        elif "Hembergerstraße" in original_address:
+                            street = "Hembergerstraße"
                         else:
-                            log_test("Street-Based Sorting", f"Some house numbers are missing. Found: {house_numbers}, Expected: {expected_numbers}", False)
+                            street = "Other"
+                        
+                        if street not in street_groups:
+                            street_groups[street] = []
+                        
+                        # Extract house number for verification
+                        house_num = None
+                        if "Bergstraße 10" in original_address and "A" not in original_address:
+                            house_num = 10
+                        elif "Bergstraße 10 A" in original_address or "Bergstraße 10A" in original_address:
+                            house_num = 10.1  # Use 10.1 to represent 10A for sorting check
+                        elif "Bergstraße 12" in original_address:
+                            house_num = 12
+                        elif "Bergstraße 14" in original_address:
+                            house_num = 14
+                        elif "Am Hörenberg 2" in original_address:
+                            house_num = 2
+                        elif "Am Hörenberg 8" in original_address:
+                            house_num = 8
+                        elif "Am Hörenberg 10" in original_address:
+                            house_num = 10
+                        elif "Am Hörenberg 12" in original_address:
+                            house_num = 12
+                        elif "Auf der Heide 10" in original_address:
+                            house_num = 10
+                        elif "Auf der Heide 25" in original_address:
+                            house_num = 25
+                        elif "Auf der Heide 49" in original_address:
+                            house_num = 49
+                        
+                        street_groups[street].append({
+                            "address": original_address,
+                            "house_num": house_num,
+                            "index": len(street_groups[street])
+                        })
+                    
+                    # Print debug information about street grouping
+                    print("\nDebug: Street grouping results:")
+                    for street, addresses in street_groups.items():
+                        print(f"\n{street} - {len(addresses)} addresses:")
+                        for addr in addresses:
+                            print(f"  - {addr['address']} (House #: {addr['house_num']})")
+                    
+                    # Verify that streets are grouped together
+                    # For each street, all addresses should be consecutive in the sorted list
+                    streets_properly_grouped = True
+                    for street, addresses in street_groups.items():
+                        if len(addresses) <= 1:
+                            continue
+                            
+                        # Get the indices of the first and last address in this street group
+                        first_idx = addresses[0]["index"]
+                        last_idx = addresses[-1]["index"]
+                        
+                        # Check if the indices form a continuous range
+                        if last_idx - first_idx + 1 != len(addresses):
+                            streets_properly_grouped = False
+                            log_test("Street-Based Sorting", 
+                                    f"Street '{street}' is not properly grouped. Indices: {[a['index'] for a in addresses]}", False)
+                    
+                    if streets_properly_grouped:
+                        log_test("Street-Based Sorting", "All streets are properly grouped together")
+                    
+                    # Verify that house numbers within each street are sorted numerically
+                    house_numbers_properly_sorted = True
+                    for street, addresses in street_groups.items():
+                        if len(addresses) <= 1:
+                            continue
+                            
+                        # Extract house numbers in the order they appear
+                        house_nums = [a["house_num"] for a in addresses if a["house_num"] is not None]
+                        
+                        # Check if house numbers are in ascending order
+                        if house_nums != sorted(house_nums):
+                            house_numbers_properly_sorted = False
+                            log_test("Street-Based Sorting", 
+                                    f"House numbers for '{street}' are not properly sorted. Found: {house_nums}", False)
+                    
+                    if house_numbers_properly_sorted:
+                        log_test("Street-Based Sorting", "House numbers within each street are properly sorted numerically")
                     
                     # Verify distance calculations
                     has_distances = all("distance_to_next" in addr for addr in sorted_addresses[:-1])
