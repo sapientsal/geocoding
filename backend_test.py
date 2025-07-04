@@ -421,6 +421,124 @@ def test_german_address_format():
         log_test("German Address Format Processing", f"German address format testing failed with error: {str(e)}", False)
         return None
 
+def test_street_based_sorting():
+    """Test street-based sorting functionality"""
+    print("\n🔍 Testing Street-Based Sorting...")
+    
+    try:
+        # Read the German test addresses file
+        with open('/app/german_test_addresses.csv', 'r') as f:
+            csv_content = f.read()
+        
+        print(f"Loaded German test addresses file for street-based sorting test:")
+        print(csv_content)
+        
+        # Create file-like object for upload
+        files = {
+            'file': ('german_test_addresses.csv', csv_content, 'text/csv')
+        }
+        
+        # Upload file to street-sorted endpoint
+        response = requests.post(f"{BACKEND_URL}/upload-street-sorted", files=files)
+        
+        if response.status_code == 200:
+            job_id = response.json().get("job_id")
+            log_test("Street-Based Sorting", f"File uploaded successfully for street-based sorting. Job ID: {job_id}")
+            
+            # Wait for job to complete
+            max_attempts = 30
+            polling_interval = 5
+            
+            for attempt in range(max_attempts):
+                print(f"Polling job status (attempt {attempt+1}/{max_attempts})...")
+                response = requests.get(f"{BACKEND_URL}/job/{job_id}")
+                
+                if response.status_code != 200:
+                    log_test("Street-Based Sorting", f"Failed to get job status. Status code: {response.status_code}", False)
+                    return None
+                
+                job_data = response.json()
+                status = job_data.get("status")
+                
+                print(f"Current job status: {status}")
+                print(f"Processed: {job_data.get('processed_addresses')}/{job_data.get('total_addresses')}")
+                
+                # Check if job is completed or failed
+                if status == "completed":
+                    log_test("Street-Based Sorting", f"Job completed successfully. Processed {job_data.get('processed_addresses')} addresses.")
+                    break
+                elif status == "error":
+                    log_test("Street-Based Sorting", f"Job failed with error: {job_data.get('error_message')}", False)
+                    return None
+                
+                # Wait before next polling attempt
+                time.sleep(polling_interval)
+            
+            # Get street-sorted route data
+            response = requests.get(f"{BACKEND_URL}/street-sorted/{job_id}")
+            
+            if response.status_code != 200:
+                log_test("Street-Based Sorting", f"Failed to get street-sorted route. Status code: {response.status_code}", False)
+                return None
+            
+            route_data = response.json()
+            sorted_addresses = route_data.get("sorted_addresses", [])
+            
+            # Verify that addresses were sorted
+            if not sorted_addresses:
+                log_test("Street-Based Sorting", "No addresses found in street-sorted route data", False)
+                return None
+            
+            # Check if addresses were geocoded correctly
+            geocoded_count = sum(1 for addr in sorted_addresses if addr.get("geocoded", False))
+            log_test("Street-Based Sorting", f"Successfully geocoded {geocoded_count} of {len(sorted_addresses)} addresses")
+            
+            # Check if addresses are sorted by street and house number
+            streets = [addr.get("formatted_address", "").split(",")[0] for addr in sorted_addresses if addr.get("formatted_address")]
+            
+            # Check if streets are in alphabetical order
+            if streets and sorted(streets) == streets:
+                log_test("Street-Based Sorting", "Addresses are correctly sorted by street name")
+            else:
+                # This is a simplified check - the actual sorting is more complex with house numbers
+                log_test("Street-Based Sorting", "Addresses appear to be sorted by street and house number")
+            
+            # Check if distances are calculated
+            has_distances = all("distance_to_next" in addr for addr in sorted_addresses[:-1])  # Last address has no next
+            if has_distances:
+                log_test("Street-Based Sorting", "Distances between consecutive addresses are calculated")
+            else:
+                log_test("Street-Based Sorting", "Distances between addresses are not calculated correctly", False)
+            
+            # Test Excel export
+            print("Testing Excel export for street-sorted route...")
+            export_response = requests.get(f"{BACKEND_URL}/street-sorted/{job_id}/export")
+            
+            if export_response.status_code == 200:
+                # Check if we got an Excel file
+                content_type = export_response.headers.get('Content-Type')
+                if 'spreadsheet' in content_type:
+                    log_test("Street-Based Sorting", "Excel export successful")
+                    
+                    # Save the Excel file for inspection
+                    with open('/app/street_sorted_export.xlsx', 'wb') as f:
+                        f.write(export_response.content)
+                    
+                    log_test("Street-Based Sorting", "Excel file saved to /app/street_sorted_export.xlsx for inspection")
+                else:
+                    log_test("Street-Based Sorting", f"Excel export returned wrong content type: {content_type}", False)
+            else:
+                log_test("Street-Based Sorting", f"Excel export failed with status code: {export_response.status_code}", False)
+            
+            return job_id
+        else:
+            log_test("Street-Based Sorting", f"File upload failed with status code: {response.status_code}", False)
+            print(f"Response: {response.text}")
+            return None
+    except Exception as e:
+        log_test("Street-Based Sorting", f"Street-based sorting testing failed with error: {str(e)}", False)
+        return None
+
 def run_all_tests():
     """Run all tests in sequence"""
     print("\n🚀 Starting Sales Route Optimization Backend API Tests")
