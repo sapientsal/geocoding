@@ -57,6 +57,39 @@ except Exception as e:
     print(f"❌ MongoDB connection failed: {e}")
     raise
 
+@app.exception_handler(Exception)
+async def global_exception_handler(request, exc):
+    """Global exception handler for better error responses"""
+    import traceback
+    
+    error_id = str(uuid.uuid4())[:8]
+    error_details = {
+        "error_id": error_id,
+        "error_type": type(exc).__name__,
+        "message": str(exc),
+        "path": str(request.url)
+    }
+    
+    # Log the error
+    print(f"❌ Error {error_id}: {type(exc).__name__} - {str(exc)}")
+    print(f"📍 Path: {request.url}")
+    
+    if isinstance(exc, HTTPException):
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={"detail": exc.detail, "error_id": error_id}
+        )
+    
+    # For unexpected errors, return 500
+    return JSONResponse(
+        status_code=500,
+        content={
+            "detail": "Ein unerwarteter Fehler ist aufgetreten. Bitte versuchen Sie es später erneut.",
+            "error_id": error_id,
+            "error_type": type(exc).__name__
+        }
+    )
+
 # Pydantic models
 class Address(BaseModel):
     id: str
