@@ -1629,7 +1629,8 @@ async def get_job_status(job_id: str):
         "geocoded_addresses": job["geocoded_addresses"],
         "error_message": job.get("error_message"),
         "created_at": job["created_at"].isoformat() if job["created_at"] else None,
-        "completed_at": job["completed_at"].isoformat() if job.get("completed_at") else None
+        "completed_at": job["completed_at"].isoformat() if job.get("completed_at") else None,
+        "sorting_type": job.get("sorting_type", "route_optimization")  # Add sorting_type
     }
     
     return job_data
