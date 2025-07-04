@@ -4,6 +4,24 @@
   max-width: 1200px;
 }
 
+/* Leaflet Map Fixes */
+.leaflet-container {
+  height: 100%;
+  width: 100%;
+  z-index: 1;
+}
+
+/* Custom Leaflet Div Icon */
+.custom-div-icon {
+  background: none !important;
+  border: none !important;
+}
+
+/* Map Modal */
+.map-modal {
+  z-index: 1000;
+}
+
 /* Upload area animations */
 .upload-area {
   transition: all 0.3s ease;
@@ -104,6 +122,15 @@
   .grid-cols-3 {
     grid-template-columns: 1fr;
     gap: 1rem;
+  }
+  
+  /* Map responsive */
+  .map-container {
+    height: 400px !important;
+  }
+  
+  .grid-cols-1.lg\\:grid-cols-4 {
+    grid-template-columns: 1fr;
   }
 }
 
