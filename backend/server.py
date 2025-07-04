@@ -1223,8 +1223,38 @@ async def delete_job(job_id: str):
     
     return {"message": "Job deleted successfully"}
 
-@app.get("/api/health")
-async def health_check():
+@app.get("/api/cache/stats")
+async def get_cache_stats():
+    """Get geocoding cache statistics for performance monitoring"""
+    cache_size = len(address_cache)
+    
+    # Count successful vs failed entries
+    successful = sum(1 for entry in address_cache.values() if entry['lat'] is not None)
+    failed = cache_size - successful
+    
+    # Calculate cache hit rate (estimated)
+    total_requests = successful + failed
+    hit_rate = (successful / total_requests * 100) if total_requests > 0 else 0
+    
+    return {
+        "cache_size": cache_size,
+        "successful_geocodes": successful,
+        "failed_geocodes": failed,
+        "estimated_hit_rate": f"{hit_rate:.1f}%",
+        "memory_usage_estimate": f"{cache_size * 0.5:.1f}KB"  # Rough estimate
+    }
+
+@app.delete("/api/cache/clear")
+async def clear_geocoding_cache():
+    """Clear geocoding cache (admin function)"""
+    global address_cache
+    old_size = len(address_cache)
+    address_cache.clear()
+    
+    return {
+        "message": f"Cache cleared successfully. Removed {old_size} entries.",
+        "new_cache_size": 0
+    }
     """Health check endpoint"""
     return {"status": "healthy", "message": "Sales Route Optimizer API is running"}
 
