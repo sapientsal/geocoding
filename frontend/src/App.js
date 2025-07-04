@@ -201,6 +201,7 @@ function App() {
       alert(`Unerwarteter Fehler: ${error.message || 'Unbekannter Fehler'}`);
     }
   };
+  const resetFileSelection = () => {
     setSelectedFile(null);
     setFilePreview(null);
     setShowPreview(false);
