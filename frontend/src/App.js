@@ -129,11 +129,7 @@ function App() {
   const handleUpload = async () => {
     if (!selectedFile) return;
 
-    // Sofort Ladebalken anzeigen und Preview verstecken
-    setUploading(true);
-    setShowPreview(false);
-    setFilePreview(null);
-
+    // UI ist bereits auf "loading" durch den onClick Handler
     const formData = new FormData();
     formData.append('file', selectedFile);
 
@@ -151,13 +147,18 @@ function App() {
         fetchJobs();
       } else {
         alert(`Upload fehlgeschlagen: ${data.detail}`);
+        // Reset UI on error
+        setUploading(false);
+        setShowPreview(true);
       }
     } catch (error) {
       console.error('Error uploading file:', error);
       alert('Fehler beim Upload der Datei');
-    } finally {
+      // Reset UI on error
       setUploading(false);
+      setShowPreview(true);
     }
+    // Note: setUploading(false) wird durch Job-Status-Updates gehandhabt
   };
 
   const handleDeleteJob = async (jobId) => {
