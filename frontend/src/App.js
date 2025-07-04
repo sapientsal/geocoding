@@ -633,17 +633,7 @@ function App() {
               </button>
               
               <button
-                onClick={() => {
-                  // Komplett zurücksetzen für neue Datei-Auswahl
-                  setSelectedFile(null);
-                  setShowPreview(false);
-                  setFilePreview(null);
-                  setUploadStatus('idle');
-                  setUploadProgress(0);
-                  // Input field zurücksetzen
-                  const fileInput = document.getElementById('file-input');
-                  if (fileInput) fileInput.value = '';
-                }}
+                onClick={resetFileSelection}
                 className="px-6 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
                 disabled={uploadStatus !== 'idle'}
               >
