@@ -187,7 +187,7 @@ function App() {
       } else {
         alert(`Upload fehlgeschlagen: ${data.detail}`);
         // Reset UI on error
-        setUploading(false);
+        setUploadStatus('idle');
         setShowPreview(true);
       }
     } catch (error) {
