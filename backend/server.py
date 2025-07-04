@@ -262,7 +262,11 @@ def sort_addresses_by_street_and_house_number(df, geocoded_data):
     
     # Fill NaN values for sorting
     working_df['street_clean'] = working_df['street_clean'].fillna('')
-    working_df['house_number_numeric'] = working_df['house_number_numeric'].fillna(0)
+    
+    # Ensure numeric values are integers and not NaN
+    working_df['house_number_numeric'] = working_df['house_number_numeric'].apply(
+        lambda x: 0 if pd.isna(x) else int(x)
+    )
     working_df['house_number_letter'] = working_df['house_number_letter'].fillna('')
     
     # Sort by street name, then house number (numeric), then letter
