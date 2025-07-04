@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import './App.css';
@@ -14,30 +14,141 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
 });
 
-// Custom Icons für nummerierte Marker
-const createNumberedIcon = (number, isStart = false, isEnd = false) => {
-  const color = isStart ? '#22c55e' : isEnd ? '#ef4444' : '#3b82f6';
+// Erweiterte Custom Icons für nummerierte Marker
+const createEnhancedNumberedIcon = (number, isStart = false, isEnd = false) => {
+  const baseColor = isStart ? '#22c55e' : isEnd ? '#ef4444' : '#3b82f6';
+  const shadowColor = isStart ? '#16a34a' : isEnd ? '#dc2626' : '#2563eb';
   const textColor = '#ffffff';
+  const size = isStart || isEnd ? 40 : 35;
   
   return L.divIcon({
-    html: `<div style="
-      background-color: ${color}; 
-      color: ${textColor}; 
-      width: 30px; 
-      height: 30px; 
-      border-radius: 50%; 
-      display: flex; 
-      align-items: center; 
-      justify-content: center; 
-      font-weight: bold; 
-      font-size: 12px;
-      border: 2px solid white;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-    ">${number}</div>`,
-    className: 'custom-div-icon',
-    iconSize: [30, 30],
-    iconAnchor: [15, 15]
+    html: `
+      <div style="
+        position: relative;
+        width: ${size}px;
+        height: ${size}px;
+      ">
+        <div style="
+          background: linear-gradient(145deg, ${baseColor} 0%, ${shadowColor} 100%);
+          color: ${textColor}; 
+          width: ${size}px; 
+          height: ${size}px; 
+          border-radius: 50%; 
+          display: flex; 
+          align-items: center; 
+          justify-content: center; 
+          font-weight: bold; 
+          font-size: ${isStart || isEnd ? '14px' : '12px'};
+          border: 3px solid white;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.4), 0 2px 6px rgba(0,0,0,0.2);
+          position: relative;
+          z-index: 2;
+          transform: ${isStart || isEnd ? 'scale(1.1)' : 'scale(1)'};
+          transition: all 0.3s ease;
+        ">${number}</div>
+        <div style="
+          position: absolute;
+          top: 50%;
+          left: 50%;
+          transform: translate(-50%, -50%);
+          width: ${size + 10}px;
+          height: ${size + 10}px;
+          background: ${baseColor};
+          border-radius: 50%;
+          opacity: 0.2;
+          z-index: 1;
+          animation: pulse 2s infinite;
+        "></div>
+      </div>
+    `,
+    className: 'custom-enhanced-icon',
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size / 2],
+    popupAnchor: [0, -size / 2]
   });
+};
+
+// Komponente für automatische Kartenanpassung
+const MapFitBounds = ({ addresses }) => {
+  const map = useMap();
+  
+  useEffect(() => {
+    if (addresses && addresses.length > 0) {
+      const validAddresses = addresses.filter(addr => addr.latitude && addr.longitude);
+      if (validAddresses.length > 0) {
+        const bounds = L.latLngBounds(
+          validAddresses.map(addr => [addr.latitude, addr.longitude])
+        );
+        
+        // Padding hinzufügen für bessere Sicht
+        const options = {
+          padding: [20, 20],
+          maxZoom: 16
+        };
+        
+        map.fitBounds(bounds, options);
+      }
+    }
+  }, [addresses, map]);
+  
+  return null;
+};
+
+// Komponente für erweiterte Kartensteuerung
+const MapControls = ({ onFullscreen, onResetView, onLayerChange, currentLayer }) => {
+  const map = useMap();
+  
+  const handleResetView = () => {
+    onResetView();
+  };
+  
+  return (
+    <div className="map-controls">
+      <div className="map-control-panel">
+        <button
+          onClick={onFullscreen}
+          className="map-control-btn fullscreen-btn"
+          title="Vollbild"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+          </svg>
+        </button>
+        <button
+          onClick={handleResetView}
+          className="map-control-btn reset-btn"
+          title="Ansicht zurücksetzen"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+        </button>
+        <select
+          value={currentLayer}
+          onChange={(e) => onLayerChange(e.target.value)}
+          className="map-layer-select"
+          title="Kartenansicht wählen"
+        >
+          <option value="standard">Standard</option>
+          <option value="satellite">Satellit</option>
+          <option value="terrain">Terrain</option>
+        </select>
+      </div>
+    </div>
+  );
+};
+
+// Berechnung der Distanz zwischen zwei Punkten (Haversine-Formel)
+const calculateDistance = (lat1, lon1, lat2, lon2) => {
+  const R = 6371; // Erdradius in km
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = 
+    Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+    Math.sin(dLon/2) * Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R * c;
 };
 
 function App() {
