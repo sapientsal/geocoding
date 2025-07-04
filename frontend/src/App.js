@@ -59,12 +59,12 @@ function App() {
     fetchJobs();
   }, []);
 
-  // Poll job status when there's a current job
+  // Poll job status more frequently for better live updates
   useEffect(() => {
     if (currentJobId) {
       const interval = setInterval(() => {
         fetchJobStatus(currentJobId);
-      }, 2000);
+      }, 1000); // Update every 1 second instead of 2
 
       return () => clearInterval(interval);
     }
