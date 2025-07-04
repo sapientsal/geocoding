@@ -524,7 +524,7 @@ def cluster_based_optimization(addresses: List[Address], geocoded_indices: List[
     return route
 
 async def process_upload_job(job_id: str, file_content: bytes, filename: str):
-    """Background task to process uploaded file"""
+    """Background task to process uploaded file with enhanced error handling and performance"""
     try:
         # Update job status
         upload_jobs_collection.update_one(
@@ -532,16 +532,30 @@ async def process_upload_job(job_id: str, file_content: bytes, filename: str):
             {"$set": {"status": "parsing"}}
         )
         
-        # Parse Excel file
+        # Parse Excel file with better error handling
         try:
             if filename.endswith('.csv'):
-                df = pd.read_csv(BytesIO(file_content))
+                df = pd.read_csv(BytesIO(file_content), encoding='utf-8')
             else:
-                df = pd.read_excel(BytesIO(file_content))
+                # Try multiple engines for Excel files
+                try:
+                    df = pd.read_excel(BytesIO(file_content), engine='openpyxl')
+                except Exception:
+                    df = pd.read_excel(BytesIO(file_content), engine='xlrd')
+        except UnicodeDecodeError:
+            # Try different encodings for CSV
+            for encoding in ['latin-1', 'iso-8859-1', 'cp1252']:
+                try:
+                    df = pd.read_csv(BytesIO(file_content), encoding=encoding)
+                    break
+                except:
+                    continue
+            else:
+                raise ValueError("Datei-Encoding konnte nicht erkannt werden. Bitte speichern Sie die Datei als UTF-8.")
         except Exception as e:
             upload_jobs_collection.update_one(
                 {"id": job_id},
-                {"$set": {"status": "error", "error_message": f"File parsing error: {str(e)}"}}
+                {"$set": {"status": "error", "error_message": f"Datei konnte nicht gelesen werden: {str(e)}"}}
             )
             return
         
