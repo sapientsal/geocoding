@@ -1355,6 +1355,24 @@ async def process_street_sorted_job(job_id: str, file_content: bytes, filename: 
             try:
                 print(f"Geocoding address {i+1}/{total_addresses}: {address}")
                 geocoded = await geocode_address_with_cache(address)
+                
+                # Extract street name from geocoded result if available
+                street_name = ""
+                if geocoded.get('formatted_address'):
+                    # Try to extract street name from formatted address
+                    parts = geocoded.get('formatted_address', '').split(',')
+                    if parts and len(parts) > 0:
+                        street_part = parts[0].strip()
+                        # Extract just the street name without the number
+                        street_words = street_part.split()
+                        if len(street_words) > 1 and any(c.isdigit() for c in street_words[-1]):
+                            street_name = ' '.join(street_words[:-1])
+                        else:
+                            street_name = street_part
+                
+                # Add street name to geocoded data
+                geocoded['street'] = street_name
+                
                 geocoded_data.append(geocoded)
                 if geocoded.get('latitude') and geocoded.get('longitude'):
                     geocoded_count += 1
@@ -1384,13 +1402,165 @@ async def process_street_sorted_job(job_id: str, file_content: bytes, filename: 
             {"$set": {"status": "sorting"}}
         )
         
-        sorted_df, distances = sort_addresses_by_street_and_house_number(df, geocoded_data)
+        # IMPROVED SORTING IMPLEMENTATION
+        # Create a working copy with original index to preserve row relationships
+        working_df = df.copy()
+        working_df['original_index'] = working_df.index
+        
+        # Add geocoding data
+        for i, geocoded in enumerate(geocoded_data):
+            if i < len(working_df):
+                working_df.loc[i, 'latitude'] = geocoded.get('latitude')
+                working_df.loc[i, 'longitude'] = geocoded.get('longitude')
+                working_df.loc[i, 'geocoded_address'] = geocoded.get('formatted_address', '')
+                working_df.loc[i, 'street_from_geocoding'] = geocoded.get('street', '')
+        
+        # Detect address columns
+        if has_german_format:
+            # Clean street names for grouping
+            working_df['street_clean'] = working_df[street_col].astype(str).str.strip()
+            
+            # Remove project prefixes like "Worpswede " from street names
+            def clean_street_name(street_name):
+                if pd.isna(street_name) or str(street_name).strip() == '':
+                    return ''
+                
+                street = str(street_name).strip()
+                
+                # Remove specific project prefixes we know about
+                if street.startswith('Worpswede '):
+                    street = street[10:].strip()
+                
+                # Remove other short numeric/code prefixes
+                parts = street.split()
+                if len(parts) > 1 and len(parts[0]) <= 4 and parts[0].isalnum():
+                    # Check if the rest looks like a street name
+                    remaining = ' '.join(parts[1:])
+                    if any(char.isalpha() for char in remaining):
+                        street = remaining
+                
+                return street.strip()
+            
+            working_df['street_clean'] = working_df[street_col].apply(clean_street_name)
+            
+            # Extract house number parts for sorting
+            def extract_house_number_parts(value):
+                if pd.isna(value) or str(value).strip() == '':
+                    return (0, '')
+                
+                house_str = str(value).strip()
+                match = re.match(r'^(\d+)([A-Za-z]*).*', house_str)
+                if match:
+                    try:
+                        number = int(match.group(1))
+                        letter = match.group(2).upper() if match.group(2) else ''
+                        return (number, letter)
+                    except ValueError:
+                        return (0, house_str)
+                else:
+                    numbers = re.findall(r'\d+', house_str)
+                    if numbers:
+                        try:
+                            return (int(numbers[0]), '')
+                        except ValueError:
+                            return (0, house_str)
+                    else:
+                        return (0, house_str)
+            
+            # Process house numbers
+            working_df['house_number_numeric'] = 0
+            working_df['house_number_letter'] = ''
+            
+            for idx, row in working_df.iterrows():
+                try:
+                    house_num = row[house_num_col] if pd.notna(row[house_num_col]) else 0
+                    numeric, letter = extract_house_number_parts(house_num)
+                    working_df.loc[idx, 'house_number_numeric'] = numeric
+                    working_df.loc[idx, 'house_number_letter'] = letter
+                except Exception as e:
+                    print(f"Error processing house number: {e}")
+            
+            # Ensure numeric values are integers
+            working_df['house_number_numeric'] = working_df['house_number_numeric'].fillna(0).astype(int)
+            working_df['house_number_letter'] = working_df['house_number_letter'].fillna('')
+            
+            # Group by street and sort by house number
+            try:
+                # First, create a categorical variable for street names to ensure they stay together
+                unique_streets = sorted(working_df['street_clean'].unique())
+                street_categories = pd.Categorical(working_df['street_clean'], 
+                                                categories=unique_streets,
+                                                ordered=True)
+                working_df['street_category'] = street_categories
+                
+                # Sort by street first, then house number
+                working_df_sorted = working_df.sort_values(
+                    ['street_category', 'house_number_numeric', 'house_number_letter'],
+                    na_position='last'
+                )
+                
+                # Debug output
+                print("Sorted addresses:")
+                for i in range(min(10, len(working_df_sorted))):
+                    row = working_df_sorted.iloc[i]
+                    print(f"{i+1}. {row['street_clean']} {row['house_number_numeric']}{row['house_number_letter']}")
+                
+                # Get the original indices in the new order
+                original_indices = working_df_sorted['original_index'].tolist()
+                sorted_df = df.iloc[original_indices].copy()
+                
+                # Calculate distances between consecutive addresses
+                distances = []
+                for i in range(len(working_df_sorted)):
+                    if i < len(working_df_sorted) - 1:
+                        current_row = working_df_sorted.iloc[i]
+                        next_row = working_df_sorted.iloc[i + 1]
+                        
+                        current_lat = current_row.get('latitude')
+                        current_lon = current_row.get('longitude')
+                        next_lat = next_row.get('latitude')
+                        next_lon = next_row.get('longitude')
+                        
+                        if (current_lat is not None and current_lon is not None and
+                            next_lat is not None and next_lon is not None and
+                            not pd.isna(current_lat) and not pd.isna(current_lon) and
+                            not pd.isna(next_lat) and not pd.isna(next_lon)):
+                            distance = calculate_distance_meters(current_lat, current_lon, next_lat, next_lon)
+                            distances.append(round(distance) if distance else None)
+                        else:
+                            distances.append(None)
+                    else:
+                        distances.append(None)  # Last address has no next address
+                
+                # Add distance and geocoding columns to the sorted DataFrame
+                sorted_df['Entfernung_zur_naechsten_Adresse_m'] = distances
+                sorted_df['Breitengrad'] = working_df_sorted['latitude'].values
+                sorted_df['Laengengrad'] = working_df_sorted['longitude'].values
+                sorted_df['Geocodierte_Adresse'] = working_df_sorted['geocoded_address'].values
+                
+            except Exception as e:
+                print(f"Error during sorting: {e}")
+                # Fallback to original order
+                sorted_df = df.copy()
+                distances = [None] * len(sorted_df)
+                sorted_df['Entfernung_zur_naechsten_Adresse_m'] = distances
+                sorted_df['Breitengrad'] = working_df['latitude'].values if 'latitude' in working_df.columns else [None] * len(sorted_df)
+                sorted_df['Laengengrad'] = working_df['longitude'].values if 'longitude' in working_df.columns else [None] * len(sorted_df)
+                sorted_df['Geocodierte_Adresse'] = working_df['geocoded_address'].values if 'geocoded_address' in working_df.columns else [''] * len(sorted_df)
+        else:
+            # If we don't have German format, just use the original order
+            sorted_df = df.copy()
+            distances = [None] * len(sorted_df)
+            sorted_df['Entfernung_zur_naechsten_Adresse_m'] = distances
+            sorted_df['Breitengrad'] = [geocoded_data[i].get('latitude') if i < len(geocoded_data) else None for i in range(len(sorted_df))]
+            sorted_df['Laengengrad'] = [geocoded_data[i].get('longitude') if i < len(geocoded_data) else None for i in range(len(sorted_df))]
+            sorted_df['Geocodierte_Adresse'] = [geocoded_data[i].get('formatted_address', '') if i < len(geocoded_data) else '' for i in range(len(sorted_df))]
         
         # Store results in database
         sorted_addresses = []
         for idx, row in sorted_df.iterrows():
             # Find the corresponding geocoded data for this row
-            original_idx = sorted_df.index[idx] if hasattr(sorted_df, 'index') else idx
+            original_idx = idx
             geocoded_info = geocoded_data[original_idx] if original_idx < len(geocoded_data) else {}
             
             # Convert any NaN or infinity values to None for JSON serialization
