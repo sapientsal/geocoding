@@ -852,6 +852,7 @@ function App() {
                   {uploadStatus === 'uploading' ? '📁 Datei wird hochgeladen' :
                    jobStatus?.status === 'geocoding' ? '🗺️ Geocodierung läuft' :
                    jobStatus?.status === 'optimizing' ? '🚀 Route wird optimiert' :
+                   jobStatus?.status === 'sorting' ? '📍 Straßen-Sortierung läuft' :
                    jobStatus?.status === 'parsing' ? '📊 Datei wird analysiert' :
                    '⚡ Verarbeitung läuft'}
                 </span>
