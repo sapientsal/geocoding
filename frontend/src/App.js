@@ -198,13 +198,16 @@ function App() {
       if (response.ok) {
         setUploadProgress(80);
         setCurrentJobId(data.job_id);
-        setSelectedFile(null);
         setUploadProgress(100);
         
         // Nach erfolgreichem Upload Status zurücksetzen
         setTimeout(() => {
           setUploadStatus('idle');
           setUploadProgress(0);
+          // Reset file selection und preview states für nächsten Upload
+          setSelectedFile(null);
+          setFilePreview(null);
+          setShowPreview(false);
         }, 1000);
         
         fetchJobs();
