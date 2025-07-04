@@ -431,6 +431,42 @@ function App() {
           </div>
         </div>
 
+        {/* Compact Processing Banner for Current Jobs */}
+        {jobStatus && jobStatus.status !== 'completed' && jobStatus.status !== 'error' && (
+          <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-6 py-3 mb-4 rounded-lg shadow-lg">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <svg className="animate-spin h-5 w-5 text-white mr-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <span className="font-medium">
+                  {jobStatus.status === 'geocoding' ? '🗺️ Geocodierung läuft' :
+                   jobStatus.status === 'optimizing' ? '🚀 Route wird optimiert' :
+                   jobStatus.status === 'parsing' ? '📊 Datei wird analysiert' :
+                   '⚡ Verarbeitung läuft'}
+                </span>
+              </div>
+              <div className="flex items-center space-x-4">
+                <div className="text-sm">
+                  <span>
+                    {jobStatus.status === 'geocoding' ? 
+                      `${jobStatus.processed_addresses}/${jobStatus.total_addresses} Adressen` :
+                      `${getProgressPercentage(jobStatus).toFixed(0)}%`
+                    }
+                  </span>
+                </div>
+                <div className="w-32 bg-blue-500 rounded-full h-2">
+                  <div 
+                    className="bg-white h-2 rounded-full transition-all duration-500"
+                    style={{width: `${getProgressPercentage(jobStatus)}%`}}
+                  ></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Compact Upload Progress Banner - Non-blocking */}
         {uploadStatus === 'uploading' && (
           <div className="bg-blue-600 text-white px-6 py-3 mb-4 rounded-lg shadow-lg">
