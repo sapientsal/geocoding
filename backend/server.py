@@ -1352,6 +1352,14 @@ async def process_street_sorted_job(job_id: str, file_content: bytes, filename: 
             original_idx = sorted_df.index[idx] if hasattr(sorted_df, 'index') else idx
             geocoded_info = geocoded_data[original_idx] if original_idx < len(geocoded_data) else {}
             
+            # Convert any NaN or infinity values to None for JSON serialization
+            row_dict = {}
+            for k, v in row.to_dict().items():
+                if isinstance(v, float) and (pd.isna(v) or math.isinf(v)):
+                    row_dict[k] = None
+                else:
+                    row_dict[k] = v
+            
             address_data = {
                 "id": str(uuid.uuid4()),
                 "original_address": addresses_to_geocode[original_idx] if original_idx < len(addresses_to_geocode) else "",
@@ -1359,8 +1367,8 @@ async def process_street_sorted_job(job_id: str, file_content: bytes, filename: 
                 "longitude": geocoded_info.get('longitude'),
                 "formatted_address": geocoded_info.get('formatted_address', ''),
                 "geocoded": bool(geocoded_info.get('latitude') and geocoded_info.get('longitude')),
-                "distance_to_next": row.get('Entfernung_zur_naechsten_Adresse_m'),
-                "row_data": row.to_dict()  # Store all original data
+                "distance_to_next": None if pd.isna(row.get('Entfernung_zur_naechsten_Adresse_m')) else row.get('Entfernung_zur_naechsten_Adresse_m'),
+                "row_data": row_dict  # Store all original data with NaN values converted to None
             }
             sorted_addresses.append(address_data)
         
