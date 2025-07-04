@@ -200,9 +200,9 @@ backend:
 
   - task: "Street-Based Sorting"
     implemented: true
-    working: false
+    working: true
     file: "server.py"
-    stuck_count: 1
+    stuck_count: 0
     priority: "high"
     needs_retesting: false
     status_history:
@@ -212,6 +212,9 @@ backend:
       - working: false
         agent: "testing"
         comment: "The /api/upload-street-sorted endpoint successfully accepts files and creates jobs, but the sorting process fails with 'cannot convert float NaN to integer' error. This is likely happening in the extract_house_number_parts function when it tries to convert a NaN value to an integer. The implementation needs to be fixed to handle NaN values properly."
+      - working: true
+        agent: "testing"
+        comment: "Fixed the NaN handling issues in extract_house_number_parts function and improved JSON serialization for the /api/street-sorted/{job_id} endpoint. The street-based sorting functionality now works correctly. All addresses are properly sorted, distance calculations work correctly, and the Excel export functionality is working as expected."
 
 frontend:
   - task: "File Upload Interface"
