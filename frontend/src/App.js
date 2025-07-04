@@ -222,9 +222,75 @@ function App() {
       const data = await response.json();
       setRoute(data);
       setShowRoute(true);
+      
+      // Berechne Distanzen zwischen aufeinanderfolgenden Punkten
+      if (data.optimized_addresses && data.optimized_addresses.length > 1) {
+        const distances = [];
+        for (let i = 0; i < data.optimized_addresses.length - 1; i++) {
+          const current = data.optimized_addresses[i];
+          const next = data.optimized_addresses[i + 1];
+          
+          if (current.latitude && current.longitude && next.latitude && next.longitude) {
+            const distance = calculateDistance(
+              current.latitude, current.longitude,
+              next.latitude, next.longitude
+            );
+            distances.push({
+              from: i,
+              to: i + 1,
+              distance: distance,
+              fromAddress: current.original_address,
+              toAddress: next.original_address
+            });
+          }
+        }
+        setRouteDistances(distances);
+      }
     } catch (error) {
       console.error('Error fetching route:', error);
       alert('Error fetching route data');
+    }
+  };
+
+  const handleFullscreen = () => {
+    setIsFullscreen(!isFullscreen);
+  };
+
+  const handleResetView = () => {
+    if (mapRef.current && route?.optimized_addresses) {
+      const validAddresses = route.optimized_addresses.filter(addr => addr.latitude && addr.longitude);
+      if (validAddresses.length > 0) {
+        const bounds = L.latLngBounds(
+          validAddresses.map(addr => [addr.latitude, addr.longitude])
+        );
+        mapRef.current.fitBounds(bounds, { padding: [20, 20], maxZoom: 16 });
+      }
+    }
+  };
+
+  const handleLayerChange = (layer) => {
+    setCurrentMapLayer(layer);
+  };
+
+  const getTileLayerUrl = (layer) => {
+    switch (layer) {
+      case 'satellite':
+        return 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
+      case 'terrain':
+        return 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png';
+      default:
+        return 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+    }
+  };
+
+  const getTileLayerAttribution = (layer) => {
+    switch (layer) {
+      case 'satellite':
+        return '&copy; <a href="https://www.esri.com/">Esri</a> &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community';
+      case 'terrain':
+        return '&copy; <a href="https://www.opentopomap.org/">OpenTopoMap</a> contributors';
+      default:
+        return '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
     }
   };
 
