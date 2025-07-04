@@ -130,19 +130,26 @@ class UploadJob(BaseModel):
     completed_at: Optional[datetime] = None
 
 def haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
-    """Calculate the great circle distance between two points on the earth in kilometers"""
-    # Convert decimal degrees to radians
-    lat1, lon1, lat2, lon2 = map(math.radians, [lat1, lon1, lat2, lon2])
+    """Calculate distance between two points in meters using Haversine formula"""
+    if not all([lat1, lon1, lat2, lon2]):
+        return None
+    
+    # Radius of Earth in meters
+    R = 6371000
+    
+    # Convert to radians
+    lat1_rad = math.radians(lat1)
+    lat2_rad = math.radians(lat2)
+    delta_lat = math.radians(lat2 - lat1)
+    delta_lon = math.radians(lon2 - lon1)
     
     # Haversine formula
-    dlat = lat2 - lat1
-    dlon = lon2 - lon1
-    a = math.sin(dlat/2)**2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon/2)**2
-    c = 2 * math.asin(math.sqrt(a))
+    a = (math.sin(delta_lat/2) * math.sin(delta_lat/2) +
+         math.cos(lat1_rad) * math.cos(lat2_rad) *
+         math.sin(delta_lon/2) * math.sin(delta_lon/2))
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
     
-    # Radius of earth in kilometers
-    r = 6371
-    return c * r
+    return R * c
 
 def geocode_address_cached(address: str) -> tuple:
     """Geocode an address with caching for performance"""
