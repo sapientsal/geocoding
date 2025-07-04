@@ -1249,6 +1249,159 @@ async def process_street_sorted_job(job_id: str, file_content: bytes, filename: 
             }}
         )
 
+# New endpoint for street-based sorting
+@app.post("/api/upload-street-sorted")
+async def upload_file_street_sorted(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
+    """Upload file for street-based address sorting"""
+    if not file.filename.lower().endswith(('.xlsx', '.xls', '.csv')):
+        raise HTTPException(status_code=400, detail="Nur Excel (.xlsx, .xls) und CSV Dateien sind erlaubt")
+    
+    try:
+        file_content = await file.read()
+        
+        # Create job
+        job_id = str(uuid.uuid4())
+        job_data = {
+            "id": job_id,
+            "filename": file.filename,
+            "status": "uploading",
+            "created_at": datetime.utcnow(),
+            "total_addresses": 0,
+            "processed_addresses": 0,
+            "geocoded_addresses": 0,
+            "sorting_type": "street_based"
+        }
+        
+        upload_jobs_collection.insert_one(job_data)
+        
+        # Start background processing
+        background_tasks.add_task(process_street_sorted_job, job_id, file_content, file.filename)
+        
+        return {"job_id": job_id, "status": "uploading", "message": "Datei wird für Straßen-Sortierung verarbeitet"}
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Fehler beim Upload: {str(e)}")
+
+# New endpoint for street-sorted export
+@app.get("/api/street-sorted/{job_id}/export")
+async def export_street_sorted_route(job_id: str):
+    """Export street-sorted addresses as Excel file"""
+    try:
+        # Get route data from database
+        route_data = routes_collection.find_one({"job_id": job_id, "sorting_type": "street_based"})
+        if not route_data:
+            raise HTTPException(status_code=404, detail="Street-sorted route not found")
+        
+        # Get job info
+        job = upload_jobs_collection.find_one({"id": job_id})
+        if not job:
+            raise HTTPException(status_code=404, detail="Job not found")
+        
+        # Prepare data for Excel export
+        addresses = route_data['sorted_addresses']
+        
+        # Create DataFrame from sorted addresses preserving all original columns
+        rows = []
+        for addr in addresses:
+            row_data = addr.get('row_data', {})
+            rows.append(row_data)
+        
+        df = pd.DataFrame(rows)
+        
+        # Create Excel file with enhanced formatting
+        output = BytesIO()
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            # Main sheet with sorted addresses
+            df.to_excel(writer, sheet_name='Straßen-sortierte Adressen', index=False)
+            
+            # Get workbook and worksheet
+            workbook = writer.book
+            worksheet = writer.sheets['Straßen-sortierte Adressen']
+            
+            # Style header row
+            header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+            header_font = Font(color="FFFFFF", bold=True)
+            
+            for cell in worksheet[1]:
+                cell.fill = header_fill
+                cell.font = header_font
+            
+            # Auto-adjust column widths
+            for column in worksheet.columns:
+                max_length = 0
+                column_letter = column[0].column_letter
+                for cell in column:
+                    try:
+                        if len(str(cell.value)) > max_length:
+                            max_length = len(str(cell.value))
+                    except:
+                        pass
+                adjusted_width = min(max_length + 2, 50)
+                worksheet.column_dimensions[column_letter].width = adjusted_width
+            
+            # Summary sheet
+            summary_data = {
+                'Datei': [job['filename']],
+                'Verarbeitungsdatum': [job['created_at'].strftime('%d.%m.%Y %H:%M:%S')],
+                'Gesamte Adressen': [len(addresses)],
+                'Erfolgreich geocodiert': [sum(1 for addr in addresses if addr.get('geocoded', False))],
+                'Sortierung': ['Nach Straße und Hausnummer'],
+                'Gesamtstrecke (m)': [route_data.get('total_distance', 0)]
+            }
+            
+            summary_df = pd.DataFrame(summary_data)
+            summary_df.to_excel(writer, sheet_name='Zusammenfassung', index=False)
+            
+            # Style summary sheet
+            summary_ws = writer.sheets['Zusammenfassung']
+            for cell in summary_ws[1]:
+                cell.fill = header_fill
+                cell.font = header_font
+            
+            for column in summary_ws.columns:
+                max_length = 0
+                column_letter = column[0].column_letter
+                for cell in column:
+                    try:
+                        if len(str(cell.value)) > max_length:
+                            max_length = len(str(cell.value))
+                    except:
+                        pass
+                adjusted_width = min(max_length + 2, 50)
+                summary_ws.column_dimensions[column_letter].width = adjusted_width
+        
+        output.seek(0)
+        
+        # Prepare filename
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"straßen_sortiert_{timestamp}.xlsx"
+        
+        return StreamingResponse(
+            BytesIO(output.read()),
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": f"attachment; filename={filename}"}
+        )
+        
+    except Exception as e:
+        print(f"Error exporting street-sorted route: {e}")
+        raise HTTPException(status_code=500, detail=f"Fehler beim Excel-Export: {str(e)}")
+
+@app.get("/api/street-sorted/{job_id}")
+async def get_street_sorted_route(job_id: str):
+    """Get street-sorted route data"""
+    try:
+        route_data = routes_collection.find_one({"job_id": job_id, "sorting_type": "street_based"})
+        if not route_data:
+            raise HTTPException(status_code=404, detail="Street-sorted route not found")
+        
+        # Convert MongoDB ObjectId to string
+        route_data["_id"] = str(route_data["_id"])
+        
+        return route_data
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching street-sorted route: {str(e)}")
+
 @app.post("/api/upload")
 async def upload_file(
     background_tasks: BackgroundTasks,
