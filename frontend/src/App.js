@@ -714,6 +714,187 @@ function App() {
           )}
         </div>
 
+        {/* Route Map Modal */}
+        {showMap && route && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg max-w-7xl max-h-[90vh] w-full overflow-hidden">
+              <div className="p-6 border-b border-gray-200 flex justify-between items-center">
+                <h2 className="text-2xl font-semibold text-gray-800">🗺️ Optimierte Route - Kartenansicht</h2>
+                <button
+                  onClick={() => setShowMap(false)}
+                  className="text-gray-500 hover:text-gray-700 text-2xl"
+                >
+                  ×
+                </button>
+              </div>
+              
+              <div className="p-6">
+                <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 h-[70vh]">
+                  {/* Map Container */}
+                  <div className="lg:col-span-3 h-full">
+                    {route.optimized_addresses && route.optimized_addresses.length > 0 && (
+                      <MapContainer
+                        center={[
+                          route.optimized_addresses[0].latitude || 53.3498, 
+                          route.optimized_addresses[0].longitude || 8.8071
+                        ]}
+                        zoom={13}
+                        style={{ height: '100%', width: '100%' }}
+                        className="rounded-lg"
+                      >
+                        <TileLayer
+                          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                        />
+                        
+                        {/* Markers für alle Adressen */}
+                        {route.optimized_addresses.map((address, index) => {
+                          if (!address.latitude || !address.longitude) return null;
+                          
+                          const isStart = index === 0;
+                          const isEnd = index === route.optimized_addresses.length - 1;
+                          
+                          return (
+                            <Marker
+                              key={address.id}
+                              position={[address.latitude, address.longitude]}
+                              icon={createNumberedIcon(index + 1, isStart, isEnd)}
+                            >
+                              <Popup>
+                                <div className="text-center">
+                                  <div className="font-bold text-lg mb-2">
+                                    {isStart ? '🟢 Start' : isEnd ? '🔴 Ziel' : `📍 Stopp ${index + 1}`}
+                                  </div>
+                                  <div className="text-sm">
+                                    <strong>{address.original_address}</strong>
+                                  </div>
+                                  {address.formatted_address && (
+                                    <div className="text-xs text-gray-600 mt-1">
+                                      {address.formatted_address}
+                                    </div>
+                                  )}
+                                  <div className="text-xs text-gray-500 mt-1">
+                                    Lat: {address.latitude.toFixed(6)}<br/>
+                                    Lng: {address.longitude.toFixed(6)}
+                                  </div>
+                                </div>
+                              </Popup>
+                            </Marker>
+                          );
+                        })}
+                        
+                        {/* Route-Linie */}
+                        {route.optimized_addresses.length > 1 && (
+                          <Polyline
+                            positions={route.optimized_addresses
+                              .filter(addr => addr.latitude && addr.longitude)
+                              .map(addr => [addr.latitude, addr.longitude])}
+                            color="#3b82f6"
+                            weight={4}
+                            opacity={0.8}
+                          />
+                        )}
+                      </MapContainer>
+                    )}
+                  </div>
+                  
+                  {/* Route Info Sidebar */}
+                  <div className="lg:col-span-1 overflow-y-auto custom-scrollbar">
+                    <div className="space-y-4">
+                      <div className="bg-blue-50 rounded-lg p-4">
+                        <h3 className="font-semibold text-blue-900 mb-2">📊 Route-Statistiken</h3>
+                        <div className="space-y-2 text-sm">
+                          <div>
+                            <span className="text-blue-700">Gesamtdistanz:</span>
+                            <span className="font-semibold ml-2">{formatDistance(route.total_distance)}</span>
+                          </div>
+                          <div>
+                            <span className="text-blue-700">Anzahl Stopps:</span>
+                            <span className="font-semibold ml-2">{route.optimized_addresses.length}</span>
+                          </div>
+                          <div>
+                            <span className="text-blue-700">Algorithmus:</span>
+                            <span className="font-semibold ml-2">2-opt optimiert</span>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div>
+                        <h3 className="font-semibold text-gray-800 mb-3">📍 Route-Reihenfolge</h3>
+                        <div className="space-y-2">
+                          {route.optimized_addresses.map((address, index) => {
+                            const isStart = index === 0;
+                            const isEnd = index === route.optimized_addresses.length - 1;
+                            
+                            return (
+                              <div
+                                key={address.id}
+                                className={`p-3 rounded-lg border-l-4 text-sm ${
+                                  isStart ? 'bg-green-50 border-green-500' :
+                                  isEnd ? 'bg-red-50 border-red-500' :
+                                  'bg-gray-50 border-blue-500'
+                                }`}
+                              >
+                                <div className="flex items-center">
+                                  <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold mr-2 ${
+                                    isStart ? 'bg-green-500 text-white' :
+                                    isEnd ? 'bg-red-500 text-white' :
+                                    'bg-blue-500 text-white'
+                                  }`}>
+                                    {index + 1}
+                                  </span>
+                                  <div className="flex-1 min-w-0">
+                                    <div className="font-medium truncate">
+                                      {address.original_address}
+                                    </div>
+                                    {!address.geocoded && (
+                                      <div className="text-xs text-red-600">
+                                        ⚠️ Nicht geocodiert
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="mt-6 flex justify-between items-center">
+                  <div className="flex space-x-4 text-sm text-gray-600">
+                    <div className="flex items-center">
+                      <div className="w-3 h-3 bg-green-500 rounded-full mr-2"></div>
+                      Start
+                    </div>
+                    <div className="flex items-center">
+                      <div className="w-3 h-3 bg-blue-500 rounded-full mr-2"></div>
+                      Zwischenstopps
+                    </div>
+                    <div className="flex items-center">
+                      <div className="w-3 h-3 bg-red-500 rounded-full mr-2"></div>
+                      Ziel
+                    </div>
+                    <div className="flex items-center">
+                      <div className="w-8 h-1 bg-blue-500 mr-2"></div>
+                      Optimierte Route
+                    </div>
+                  </div>
+                  
+                  <button
+                    onClick={exportRouteExcel}
+                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                  >
+                    📊 Excel exportieren
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Route Modal */}
         {showRoute && route && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
