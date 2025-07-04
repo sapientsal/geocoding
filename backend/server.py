@@ -298,8 +298,16 @@ def sort_addresses_by_street_and_house_number(df, geocoded_data):
     
     # Sort by street name (PRIMARY), then house number (SECONDARY), then letter (TERTIARY)
     try:
+        # IMPORTANT FIX: We need to ensure the sorting is stable and properly groups streets
+        # First, create a categorical variable for street names to ensure they stay together
+        street_categories = pd.Categorical(working_df['street_clean'], 
+                                          categories=sorted(working_df['street_clean'].unique()),
+                                          ordered=True)
+        working_df['street_category'] = street_categories
+        
+        # Now sort with the categorical street first
         working_df_sorted = working_df.sort_values([
-            'street_clean',           # PRIMARY: Group by street first
+            'street_category',        # PRIMARY: Group by street first (as categorical)
             'house_number_numeric',   # SECONDARY: Then by house number
             'house_number_letter'     # TERTIARY: Then by letter suffix
         ], na_position='last')
