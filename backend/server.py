@@ -690,7 +690,10 @@ async def process_upload_job(job_id: str, file_content: bytes, filename: str):
                 "latitude": lat,
                 "longitude": lon,
                 "geocoded": lat is not None and lon is not None,
-                "geocoding_error": error
+                "geocoding_error": error,
+                # ALLE ursprünglichen Excel-Daten speichern
+                "original_row_data": {col: str(row[col]) if pd.notna(row[col]) else "" for col in df.columns},
+                "original_row_index": index
             }
             
             addresses.append(address)
