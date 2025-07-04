@@ -8,7 +8,7 @@ import json
 from datetime import datetime
 
 # Get backend URL from frontend/.env
-BACKEND_URL = "https://2049d7ff-f0bb-467d-8f1d-1060857b0d94.preview.emergentagent.com/api"
+BACKEND_URL = "https://5eb9a30f-3d93-48d7-930d-ac4b62f3b928.preview.emergentagent.com/api"
 
 # Test results dictionary
 test_results = {
