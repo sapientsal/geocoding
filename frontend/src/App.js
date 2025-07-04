@@ -309,11 +309,9 @@ function App() {
     }
   };
 
-  const exportRouteExcel = async () => {
-    if (!route) return;
-
+  const downloadExcel = async (jobId) => {
     try {
-      const response = await fetch(`${BACKEND_URL}/api/route/${route.job_id}/export`);
+      const response = await fetch(`${BACKEND_URL}/api/route/${jobId}/export`);
       
       if (response.ok) {
         const blob = await response.blob();
@@ -323,7 +321,7 @@ function App() {
         
         // Get filename from response headers or create default
         const contentDisposition = response.headers.get('Content-Disposition');
-        let filename = `optimized_route_${route.job_id}.xlsx`;
+        let filename = `optimized_route_${jobId}.xlsx`;
         
         if (contentDisposition) {
           const filenameMatch = contentDisposition.match(/filename="?([^"]*)"?/);
@@ -338,11 +336,11 @@ function App() {
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
       } else {
-        alert('Fehler beim Export der Excel-Datei');
+        alert('Fehler beim Excel-Export');
       }
     } catch (error) {
-      console.error('Error exporting Excel:', error);
-      alert('Fehler beim Export der Excel-Datei');
+      console.error('Error downloading Excel:', error);
+      alert('Fehler beim Excel-Export');
     }
   };
 
