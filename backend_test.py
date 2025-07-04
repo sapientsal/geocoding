@@ -555,6 +555,12 @@ def run_all_tests():
     print("=" * 80)
     german_job_id = test_german_address_format()
     
+    # Test street-based sorting
+    print("\n" + "=" * 80)
+    print("🛣️ Testing Street-Based Sorting")
+    print("=" * 80)
+    street_sorted_job_id = test_street_based_sorting()
+    
     # Test standard file upload
     print("\n" + "=" * 80)
     print("🇺🇸 Testing Standard Address Format Processing")
