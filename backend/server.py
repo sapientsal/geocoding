@@ -37,18 +37,25 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# MongoDB connection
-MONGO_URL = os.environ.get('MONGO_URL', 'mongodb://localhost:27017/sales_routes')
+# MongoDB connection with proper error handling
+MONGO_URL = os.environ.get('MONGO_URL')
+if not MONGO_URL:
+    raise ValueError("MONGO_URL environment variable is required")
+
 try:
-    client = MongoClient(MONGO_URL)
+    client = MongoClient(MONGO_URL, serverSelectionTimeoutMS=5000)
+    # Test connection
+    client.admin.command('ismaster')
+    
     db = client['sales_routes']
     addresses_collection = db['addresses']
     routes_collection = db['routes']
     upload_jobs_collection = db['upload_jobs']
-    print(f"Successfully connected to MongoDB at {MONGO_URL}")
+    
+    print("✅ MongoDB connection successful")
 except Exception as e:
-    print(f"Error connecting to MongoDB: {str(e)}")
-    # Create mock collections for testing
+    print(f"❌ MongoDB connection failed: {e}")
+    raise
     from unittest.mock import MagicMock
     class MockCollection:
         def __init__(self, name):
