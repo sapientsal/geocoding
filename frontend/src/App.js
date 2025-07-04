@@ -128,8 +128,12 @@ function App() {
     e.stopPropagation();
     setDragActive(false);
     
+    console.log('File drop triggered:', e.dataTransfer.files); // Debug log
+    
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       const file = e.dataTransfer.files[0];
+      
+      console.log('New file dropped:', file.name); // Debug log
       
       // Reset alle states vor neuer Preview
       setUploadStatus('idle');
@@ -138,8 +142,11 @@ function App() {
       setFilePreview(null);
       
       setSelectedFile(file);
-      // Automatische Vorschau
-      previewFile(file);
+      
+      // Etwas Verzögerung für UI-Update
+      setTimeout(() => {
+        previewFile(file);
+      }, 100);
     }
   }, []);
 
