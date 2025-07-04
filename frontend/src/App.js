@@ -574,54 +574,76 @@ function App() {
           </div>
         )}
 
-        {/* Current Job Status */}
+        {/* Current Job Status with Address Counter */}
         {jobStatus && (
-          <div className="bg-white rounded-lg shadow-lg p-8 mb-8">
-            <h2 className="text-2xl font-semibold text-gray-800 mb-6">Processing Status</h2>
+          <div className="bg-white rounded-lg shadow-lg p-6 mb-8">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold text-gray-800">📊 Verarbeitungs-Status</h2>
+              <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(jobStatus.status)}`}>
+                {jobStatus.status === 'completed' ? 'Abgeschlossen' :
+                 jobStatus.status === 'error' ? 'Fehler' :
+                 jobStatus.status === 'geocoding' ? 'Geocodierung läuft' :
+                 jobStatus.status === 'optimizing' ? 'Route wird optimiert' :
+                 jobStatus.status === 'parsing' ? 'Datei wird gelesen' :
+                 jobStatus.status === 'uploading' ? 'Upload läuft' : jobStatus.status}
+              </span>
+            </div>
             
             <div className="space-y-4">
               <div className="flex justify-between items-center">
-                <span className="text-gray-700">File: {jobStatus.filename}</span>
-                <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(jobStatus.status)}`}>
-                  {jobStatus.status.charAt(0).toUpperCase() + jobStatus.status.slice(1)}
-                </span>
+                <span className="text-gray-700">📁 Datei: {jobStatus.filename}</span>
               </div>
               
-              <div className="w-full bg-gray-200 rounded-full h-4">
-                <div
-                  className="bg-blue-600 h-4 rounded-full transition-all duration-300"
-                  style={{ width: `${getProgressPercentage(jobStatus)}%` }}
-                ></div>
+              {/* Enhanced Progress Bar with Address Counter */}
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm text-gray-600">
+                  <span>Fortschritt</span>
+                  <span>
+                    {jobStatus.status === 'geocoding' ? 
+                      `${jobStatus.processed_addresses}/${jobStatus.total_addresses} Adressen geocodiert` :
+                      jobStatus.status === 'completed' ?
+                      `✅ ${jobStatus.geocoded_addresses}/${jobStatus.total_addresses} Adressen erfolgreich` :
+                      `${getProgressPercentage(jobStatus).toFixed(0)}%`
+                    }
+                  </span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-3">
+                  <div
+                    className="bg-blue-600 h-3 rounded-full transition-all duration-300"
+                    style={{ width: `${getProgressPercentage(jobStatus)}%` }}
+                  ></div>
+                </div>
               </div>
               
-              <div className="grid grid-cols-3 gap-4 text-sm">
-                <div>
-                  <span className="text-gray-600">Total Adressen:</span>
-                  <span className="font-semibold ml-2">{jobStatus.total_addresses}</span>
+              {/* Detailed Statistics */}
+              <div className="grid grid-cols-3 gap-4 text-sm bg-gray-50 rounded-lg p-4">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-blue-600">{jobStatus.total_addresses}</div>
+                  <div className="text-gray-600">Gesamt</div>
                 </div>
-                <div>
-                  <span className="text-gray-600">Verarbeitet:</span>
-                  <span className="font-semibold ml-2">{jobStatus.processed_addresses}</span>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-orange-600">{jobStatus.processed_addresses}</div>
+                  <div className="text-gray-600">Verarbeitet</div>
                 </div>
-                <div>
-                  <span className="text-gray-600">Geocodiert:</span>
-                  <span className="font-semibold ml-2">{jobStatus.geocoded_addresses}</span>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-green-600">{jobStatus.geocoded_addresses}</div>
+                  <div className="text-gray-600">Geocodiert</div>
                 </div>
               </div>
               
               {getEstimatedTime(jobStatus) && (
-                <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
                   <div className="flex items-center">
                     <svg className="w-5 h-5 text-blue-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                     <span className="text-blue-800 font-medium">
-                      Geschätzte Restzeit: {getEstimatedTime(jobStatus)}
+                      ⏱️ Verbleibende Zeit: {getEstimatedTime(jobStatus)}
                     </span>
                   </div>
-                  {jobStatus.status === 'geocoding' && jobStatus.total_addresses > 1000 && (
+                  {jobStatus.status === 'geocoding' && jobStatus.total_addresses > 100 && (
                     <p className="text-blue-700 text-sm mt-2">
-                      💡 Bei großen Listen verwenden wir Caching und optimierte Algorithmen für bessere Performance.
+                      🚀 Verwende optimierte Batch-Verarbeitung für {jobStatus.total_addresses} Adressen
                     </p>
                   )}
                 </div>
