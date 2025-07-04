@@ -254,11 +254,38 @@ def sort_addresses_by_street_and_house_number(df, geocoded_data):
     working_df['house_number_numeric'] = [data[0] for data in house_number_data]
     working_df['house_number_letter'] = [data[1] for data in house_number_data]
     
-    # Clean street names for grouping
+    # Clean street names for grouping - more conservative approach
     working_df['street_clean'] = working_df[street_col].astype(str).str.strip()
     
-    # Remove project prefixes like "Worpswede " from street names
-    working_df['street_clean'] = working_df['street_clean'].str.replace(r'^[^A-Za-z]*\s+', '', regex=True)
+    # Remove project prefixes like "Worpswede " from street names - but be more careful
+    def clean_street_name(street_name):
+        if pd.isna(street_name) or str(street_name).strip() == '':
+            return ''
+        
+        street = str(street_name).strip()
+        
+        # Remove specific project prefixes we know about
+        if street.startswith('Worpswede '):
+            street = street[10:].strip()
+        
+        # Remove other short numeric/code prefixes (but be conservative)
+        # Only remove if it's a short code followed by space and actual street name
+        parts = street.split()
+        if len(parts) > 1 and len(parts[0]) <= 4 and parts[0].isalnum():
+            # Check if the rest looks like a street name
+            remaining = ' '.join(parts[1:])
+            if any(char.isalpha() for char in remaining):
+                street = remaining
+        
+        return street.strip()
+    
+    working_df['street_clean'] = working_df[street_col].apply(clean_street_name)
+    
+    # Debug: Print unique street names to verify grouping
+    unique_streets = working_df['street_clean'].value_counts()
+    print(f"Debug: Found {len(unique_streets)} unique streets:")
+    for street, count in unique_streets.head(10).items():
+        print(f"  - '{street}': {count} addresses")
     
     # Fill NaN values for sorting
     working_df['street_clean'] = working_df['street_clean'].fillna('')
@@ -269,13 +296,19 @@ def sort_addresses_by_street_and_house_number(df, geocoded_data):
     )
     working_df['house_number_letter'] = working_df['house_number_letter'].fillna('')
     
-    # Sort by street name, then house number (numeric), then letter
+    # Sort by street name (PRIMARY), then house number (SECONDARY), then letter (TERTIARY)
     try:
         working_df_sorted = working_df.sort_values([
-            'street_clean',
-            'house_number_numeric', 
-            'house_number_letter'
+            'street_clean',           # PRIMARY: Group by street first
+            'house_number_numeric',   # SECONDARY: Then by house number
+            'house_number_letter'     # TERTIARY: Then by letter suffix
         ], na_position='last')
+        
+        print(f"Debug: Sorting completed. First 10 addresses after sorting:")
+        for i in range(min(10, len(working_df_sorted))):
+            row = working_df_sorted.iloc[i]
+            print(f"  {i+1}. {row['street_clean']} {row['house_number_numeric']}{row['house_number_letter']}")
+            
     except Exception as e:
         print(f"Error during sorting: {e}")
         # Fallback to original order
