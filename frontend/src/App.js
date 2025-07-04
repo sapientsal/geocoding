@@ -165,39 +165,62 @@ function App() {
     }
   };
 
-  const handleUpload = async () => {
+  // Sofortiger Upload-Handler
+  const handleInstantUpload = () => {
     if (!selectedFile) return;
+    
+    // SOFORT UI-State setzen - keine Verzögerung
+    setUploadStatus('uploading');
+    setShowPreview(false);
+    setFilePreview(null);
+    setUploadProgress(0);
+    
+    // Upload-Prozess starten
+    performUpload();
+  };
 
-    // UI ist bereits auf "loading" durch den onClick Handler
+  const performUpload = async () => {
     const formData = new FormData();
     formData.append('file', selectedFile);
 
     try {
+      setUploadProgress(10);
+      
       const response = await fetch(`${BACKEND_URL}/api/upload`, {
         method: 'POST',
         body: formData,
       });
 
+      setUploadProgress(50);
+
       const data = await response.json();
       
       if (response.ok) {
+        setUploadProgress(80);
         setCurrentJobId(data.job_id);
         setSelectedFile(null);
+        setUploadProgress(100);
+        
+        // Nach erfolgreichem Upload Status zurücksetzen
+        setTimeout(() => {
+          setUploadStatus('idle');
+          setUploadProgress(0);
+        }, 1000);
+        
         fetchJobs();
       } else {
         alert(`Upload fehlgeschlagen: ${data.detail}`);
-        // Reset UI on error
         setUploadStatus('idle');
         setShowPreview(true);
+        setUploadProgress(0);
       }
     } catch (error) {
       console.error('Error uploading file:', error);
       alert('Fehler beim Upload der Datei');
-      // Reset UI on error
-      setUploading(false);
+      setUploadStatus('idle');
       setShowPreview(true);
+      setUploadProgress(0);
     }
-    // Note: setUploading(false) wird durch Job-Status-Updates gehandhabt
   };
 
   const handleDeleteJob = async (jobId) => {
