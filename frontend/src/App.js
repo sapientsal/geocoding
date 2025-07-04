@@ -6,6 +6,40 @@ import './App.css';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
 
+// Fix für Leaflet Default-Icons
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
+  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+});
+
+// Custom Icons für nummerierte Marker
+const createNumberedIcon = (number, isStart = false, isEnd = false) => {
+  const color = isStart ? '#22c55e' : isEnd ? '#ef4444' : '#3b82f6';
+  const textColor = '#ffffff';
+  
+  return L.divIcon({
+    html: `<div style="
+      background-color: ${color}; 
+      color: ${textColor}; 
+      width: 30px; 
+      height: 30px; 
+      border-radius: 50%; 
+      display: flex; 
+      align-items: center; 
+      justify-content: center; 
+      font-weight: bold; 
+      font-size: 12px;
+      border: 2px solid white;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    ">${number}</div>`,
+    className: 'custom-div-icon',
+    iconSize: [30, 30],
+    iconAnchor: [15, 15]
+  });
+};
+
 function App() {
   const [jobs, setJobs] = useState([]);
   const [selectedFile, setSelectedFile] = useState(null);
