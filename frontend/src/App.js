@@ -396,9 +396,9 @@ function App() {
           <div className="flex justify-center mt-6">
             <button
               onClick={handleUpload}
-              disabled={!selectedFile || uploading}
+              disabled={!selectedFile || uploadStatus !== 'idle'}
               className={`px-8 py-3 rounded-lg font-semibold transition-colors ${
-                !selectedFile || uploading
+                !selectedFile || uploadStatus !== 'idle'
                   ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                   : 'bg-green-600 text-white hover:bg-green-700'
               }`}
