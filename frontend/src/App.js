@@ -997,7 +997,7 @@ function App() {
                         }}
                         className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
                       >
-                        🗺️ Karte
+                        🗺️ Karte anzeigen
                       </button>
                       <button
                         onClick={() => downloadExcel(job.id)}
