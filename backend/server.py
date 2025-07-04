@@ -1899,7 +1899,7 @@ async def get_jobs():
     # Convert to proper format
     job_list = []
     for job in jobs:
-        job_list.append({
+        job_data = {
             "id": job["id"],
             "filename": job["filename"],
             "status": job["status"],
@@ -1908,10 +1908,12 @@ async def get_jobs():
             "geocoded_addresses": job["geocoded_addresses"],
             "error_message": job.get("error_message"),
             "created_at": job["created_at"].isoformat() if job["created_at"] else None,
-            "completed_at": job["completed_at"].isoformat() if job.get("completed_at") else None
-        })
+            "completed_at": job["completed_at"].isoformat() if job.get("completed_at") else None,
+            "sorting_type": job.get("sorting_type", "route_optimization")  # Add sorting_type
+        }
+        job_list.append(job_data)
     
-    return {"jobs": job_list}
+    return job_list
 
 @app.delete("/api/job/{job_id}")
 async def delete_job(job_id: str):
