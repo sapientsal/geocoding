@@ -776,11 +776,11 @@ async def preview_file(file: UploadFile = File(...)):
         # Read file content
         file_content = await file.read()
         
-        # Parse Excel file (first 10 rows for preview)
+        # Parse Excel file - READ ALL ROWS for preview
         if file.filename.endswith('.csv'):
-            df = pd.read_csv(BytesIO(file_content), nrows=10)
+            df = pd.read_csv(BytesIO(file_content))  # Alle Zeilen lesen
         else:
-            df = pd.read_excel(BytesIO(file_content), nrows=10)
+            df = pd.read_excel(BytesIO(file_content))  # Alle Zeilen lesen
         
         # Clean DataFrame - replace NaN/Infinity values
         df = df.fillna("")
