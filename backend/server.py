@@ -132,9 +132,11 @@ class UploadJob(BaseModel):
 
 def extract_house_number_parts(house_number_str) -> Tuple[int, str]:
     """Extract numeric and alphabetic parts from house number for proper sorting"""
-    if pd.isna(house_number_str) or house_number_str == '' or str(house_number_str).strip() == '' or str(house_number_str).strip().lower() == 'nan':
+    # Handle NaN, None, empty strings, etc.
+    if house_number_str is None or pd.isna(house_number_str) or house_number_str == '' or str(house_number_str).strip() == '' or str(house_number_str).strip().lower() == 'nan':
         return 0, ''
     
+    # Convert to string and strip whitespace
     house_str = str(house_number_str).strip()
     
     # Use regex to extract number and letter parts
