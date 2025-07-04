@@ -167,6 +167,7 @@ function App() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [currentMapLayer, setCurrentMapLayer] = useState('standard');
   const [routeDistances, setRouteDistances] = useState([]);
+  const [sortingMode, setSortingMode] = useState('route_optimization'); // 'route_optimization' or 'street_sorting'
   const mapRef = useRef(null);
 
   // Fetch jobs on component mount
