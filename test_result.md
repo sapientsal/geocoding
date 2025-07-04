@@ -276,11 +276,9 @@ metadata:
 
 test_plan:
   current_focus:
-    - "File Upload Interface"
-    - "Real-time Progress Monitoring"
-    - "Route Visualization"
-    - "Upload History Management"
-  stuck_tasks: []
+    - "Street-Based Sorting"
+  stuck_tasks:
+    - "Street-Based Sorting"
   test_all: false
   test_priority: "high_first"
 
