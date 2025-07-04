@@ -1004,6 +1004,7 @@ function App() {
                  jobStatus.status === 'error' ? 'Fehler' :
                  jobStatus.status === 'geocoding' ? 'Geocodierung läuft' :
                  jobStatus.status === 'optimizing' ? 'Route wird optimiert' :
+                 jobStatus.status === 'sorting' ? 'Straßen-Sortierung läuft' :
                  jobStatus.status === 'parsing' ? 'Datei wird gelesen' :
                  jobStatus.status === 'uploading' ? 'Upload läuft' : jobStatus.status}
               </span>
