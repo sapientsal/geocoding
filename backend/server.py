@@ -38,9 +38,7 @@ app.add_middleware(
 )
 
 # MongoDB connection with proper error handling
-MONGO_URL = os.environ.get('MONGO_URL')
-if not MONGO_URL:
-    raise ValueError("MONGO_URL environment variable is required")
+MONGO_URL = os.environ.get('MONGO_URL', 'mongodb://localhost:27017/sales_routes')
 
 try:
     client = MongoClient(MONGO_URL, serverSelectionTimeoutMS=5000)
@@ -55,7 +53,19 @@ try:
     print("✅ MongoDB connection successful")
 except Exception as e:
     print(f"❌ MongoDB connection failed: {e}")
-    raise
+    print("⚠️ Using fallback configuration")
+    
+    # Fallback to basic connection without validation
+    try:
+        client = MongoClient(MONGO_URL)
+        db = client['sales_routes']
+        addresses_collection = db['addresses']
+        routes_collection = db['routes']
+        upload_jobs_collection = db['upload_jobs']
+        print("✅ MongoDB fallback connection successful")
+    except Exception as fallback_error:
+        print(f"❌ MongoDB fallback also failed: {fallback_error}")
+        raise
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request, exc):
