@@ -130,6 +130,13 @@ function App() {
     
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       const file = e.dataTransfer.files[0];
+      
+      // Reset alle states vor neuer Preview
+      setUploadStatus('idle');
+      setUploadProgress(0);
+      setShowPreview(false);
+      setFilePreview(null);
+      
       setSelectedFile(file);
       // Automatische Vorschau
       previewFile(file);
