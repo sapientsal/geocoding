@@ -1,27 +1,32 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pymongo import MongoClient
+from typing import List, Optional, Dict, Any
+from pydantic import BaseModel
+from datetime import datetime
+from io import BytesIO
 import pandas as pd
 import requests
 import time
 import math
 import uuid
 import os
-
-# Address cache for performance
-address_cache = {}
-from typing import List, Optional, Dict, Any
-from pydantic import BaseModel
 import json
-from io import BytesIO
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 import openpyxl
 from openpyxl.styles import PatternFill, Font
 from openpyxl.utils.dataframe import dataframe_to_rows
-from datetime import datetime
 
-app = FastAPI()
+app = FastAPI(
+    title="Sales Route Optimizer API",
+    description="API for optimizing sales routes with geocoding and route optimization",
+    version="1.0.0"
+)
+
+# Address cache for performance
+address_cache = {}
 
 # CORS middleware
 app.add_middleware(
