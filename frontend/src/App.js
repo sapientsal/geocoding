@@ -997,7 +997,7 @@ function App() {
                   </div>
                   
                   <button
-                    onClick={exportRouteExcel}
+                    onClick={() => downloadExcel(route.job_id)}
                     className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
                   >
                     Export Route (Excel)
