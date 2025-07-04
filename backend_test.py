@@ -17,7 +17,8 @@ test_results = {
     "Route Optimization Algorithm": {"status": "Not tested", "details": []},
     "Job Status Tracking": {"status": "Not tested", "details": []},
     "Database Operations": {"status": "Not tested", "details": []},
-    "German Address Format Processing": {"status": "Not tested", "details": []}
+    "German Address Format Processing": {"status": "Not tested", "details": []},
+    "Street-Based Sorting": {"status": "Not tested", "details": []}
 }
 
 def log_test(task, message, success=True):
