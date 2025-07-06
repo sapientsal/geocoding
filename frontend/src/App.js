@@ -1138,28 +1138,20 @@ function App() {
                   {job.status === 'completed' && (
                     <div className="flex space-x-3">
                       <button
-                        onClick={() => {
-                          if (job.sorting_type === 'street_based') {
-                            fetchStreetSortedRoute(job.id);
-                          } else {
-                            fetchRoute(job.id);
-                          }
-                        }}
+                        onClick={() => fetchOptimizedRoute(job.id)}
                         className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                       >
-                        {job.sorting_type === 'street_based' ? '📍 Liste anzeigen' : 'Route anzeigen'}
+                        📊 Route anzeigen
                       </button>
-                      {job.sorting_type !== 'street_based' && (
-                        <button
-                          onClick={() => {
-                            fetchRoute(job.id);
-                            setShowMap(true);
-                          }}
-                          className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
-                        >
-                          🗺️ Karte anzeigen
-                        </button>
-                      )}
+                      <button
+                        onClick={() => {
+                          fetchOptimizedRoute(job.id);
+                          setShowMap(true);
+                        }}
+                        className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+                      >
+                        🗺️ Karte anzeigen
+                      </button>
                       <button
                         onClick={() => downloadExcel(job.id)}
                         className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
