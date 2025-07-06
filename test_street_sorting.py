@@ -63,9 +63,9 @@ def test_street_based_sorting():
                 # Wait before next polling attempt
                 time.sleep(polling_interval)
             
-            # Test retrieving the route data
-            print("Testing /api/route/{job_id} endpoint...")
-            response = requests.get(f"{BACKEND_URL}/route/{job_id}")
+            # Test retrieving the street-sorted data
+            print("Testing /api/street-sorted/{job_id} endpoint...")
+            response = requests.get(f"{BACKEND_URL}/street-sorted/{job_id}")
             
             if response.status_code != 200:
                 print(f"❌ Failed to get route data. Status code: {response.status_code}")
