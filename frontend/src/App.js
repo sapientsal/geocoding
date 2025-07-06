@@ -736,56 +736,37 @@ function App() {
 
         {/* Upload Section */}
         <div className="bg-white rounded-lg shadow-lg p-8 mb-8">
-          <h2 className="text-2xl font-semibold text-gray-800 mb-6">Adressliste hochladen</h2>
+          <h2 className="text-2xl font-semibold text-gray-800 mb-6">📍 Adressliste für Door-to-Door-Vertrieb hochladen</h2>
           
-          {/* Sorting Mode Selection */}
-          <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-            <h3 className="text-lg font-medium text-gray-800 mb-4">📋 Sortierungs-Modus wählen</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div 
-                className={`p-4 border-2 rounded-lg cursor-pointer transition-all duration-300 ${
-                  sortingMode === 'route_optimization' 
-                    ? 'border-blue-500 bg-blue-50' 
-                    : 'border-gray-300 hover:border-blue-300'
-                }`}
-                onClick={() => setSortingMode('route_optimization')}
-              >
-                <div className="flex items-center mb-2">
-                  <input
-                    type="radio"
-                    checked={sortingMode === 'route_optimization'}
-                    onChange={() => setSortingMode('route_optimization')}
-                    className="mr-3"
-                  />
-                  <h4 className="font-semibold text-gray-800">🚀 Route-Optimierung</h4>
+          {/* Feature Description */}
+          <div className="mb-6 p-4 bg-gradient-to-r from-blue-50 to-green-50 rounded-lg border border-blue-200">
+            <h3 className="text-lg font-medium text-gray-800 mb-3 flex items-center">
+              <svg className="w-6 h-6 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+              Geografische Route-Optimierung
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+              <div className="flex items-start">
+                <span className="text-green-600 mr-2">✅</span>
+                <div>
+                  <div className="font-semibold">Automatische Geocodierung</div>
+                  <div className="text-gray-600">Alle Adressen werden automatisch geocodiert</div>
                 </div>
-                <p className="text-sm text-gray-600">
-                  Optimiert die kürzeste Route zwischen allen Adressen für maximale Effizienz. 
-                  Ideal für Vertriebsrouten und Lieferungen.
-                </p>
               </div>
-              
-              <div 
-                className={`p-4 border-2 rounded-lg cursor-pointer transition-all duration-300 ${
-                  sortingMode === 'street_sorting' 
-                    ? 'border-green-500 bg-green-50' 
-                    : 'border-gray-300 hover:border-green-300'
-                }`}
-                onClick={() => setSortingMode('street_sorting')}
-              >
-                <div className="flex items-center mb-2">
-                  <input
-                    type="radio"
-                    checked={sortingMode === 'street_sorting'}
-                    onChange={() => setSortingMode('street_sorting')}
-                    className="mr-3"
-                  />
-                  <h4 className="font-semibold text-gray-800">📍 Straßen-Sortierung</h4>
+              <div className="flex items-start">
+                <span className="text-green-600 mr-2">✅</span>
+                <div>
+                  <div className="font-semibold">Geografische Optimierung</div>
+                  <div className="text-gray-600">Kürzeste Wege zwischen allen Adressen</div>
                 </div>
-                <p className="text-sm text-gray-600">
-                  Sortiert nach Straßenname und Hausnummer (1, 1A, 2, 10...). 
-                  Berechnet Entfernungen zur nächsten Adresse. Behält alle Originalspalten bei.
-                </p>
+              </div>
+              <div className="flex items-start">
+                <span className="text-green-600 mr-2">✅</span>
+                <div>
+                  <div className="font-semibold">Exakte Distanzen</div>
+                  <div className="text-gray-600">Meter-genaue Entfernungsberechnung</div>
+                </div>
               </div>
             </div>
           </div>
