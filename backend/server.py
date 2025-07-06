@@ -1984,8 +1984,141 @@ async def upload_file_street_sorted(background_tasks: BackgroundTasks, file: Upl
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Fehler beim Upload: {str(e)}")
 
-# New endpoint for street-sorted export
-@app.get("/api/street-sorted/{job_id}/export")
+# New endpoints for combined geographic optimization
+@app.get("/api/optimized/{job_id}")
+async def get_optimized_route(job_id: str):
+    """Get optimized route data"""
+    try:
+        route_data = routes_collection.find_one({"job_id": job_id, "optimization_type": "geographic_door_to_door"})
+        if not route_data:
+            raise HTTPException(status_code=404, detail="Optimized route not found")
+        
+        # Convert MongoDB ObjectId to string
+        route_data["_id"] = str(route_data["_id"])
+        
+        # Handle NaN and infinity values for JSON serialization
+        def clean_for_json(obj):
+            if isinstance(obj, dict):
+                return {k: clean_for_json(v) for k, v in obj.items()}
+            elif isinstance(obj, list):
+                return [clean_for_json(item) for item in obj]
+            elif isinstance(obj, float):
+                if math.isnan(obj) or math.isinf(obj):
+                    return None
+                return obj
+            else:
+                return obj
+        
+        cleaned_data = clean_for_json(route_data)
+        return cleaned_data
+        
+    except Exception as e:
+        print(f"Error fetching optimized route: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error fetching optimized route: {str(e)}")
+
+@app.get("/api/optimized/{job_id}/export")
+async def export_optimized_route(job_id: str):
+    """Export optimized route as Excel file"""
+    try:
+        # Get route data from database
+        route_data = routes_collection.find_one({"job_id": job_id, "optimization_type": "geographic_door_to_door"})
+        if not route_data:
+            raise HTTPException(status_code=404, detail="Optimized route not found")
+        
+        # Get job info
+        job = upload_jobs_collection.find_one({"id": job_id})
+        if not job:
+            raise HTTPException(status_code=404, detail="Job not found")
+        
+        # Prepare data for Excel export
+        addresses = route_data['optimized_addresses']
+        
+        # Create DataFrame from optimized addresses preserving all original columns
+        rows = []
+        for addr in addresses:
+            row_data = addr.get('row_data', {})
+            rows.append(row_data)
+        
+        df = pd.DataFrame(rows)
+        
+        # Create Excel file with enhanced formatting
+        output = BytesIO()
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            # Main sheet with optimized addresses
+            df.to_excel(writer, sheet_name='Geografisch Optimierte Route', index=False)
+            
+            # Get workbook and worksheet
+            workbook = writer.book
+            worksheet = writer.sheets['Geografisch Optimierte Route']
+            
+            # Style header row
+            header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+            header_font = Font(color="FFFFFF", bold=True)
+            
+            for cell in worksheet[1]:
+                cell.fill = header_fill
+                cell.font = header_font
+            
+            # Auto-adjust column widths
+            for column in worksheet.columns:
+                max_length = 0
+                column_letter = column[0].column_letter
+                for cell in column:
+                    try:
+                        if len(str(cell.value)) > max_length:
+                            max_length = len(str(cell.value))
+                    except:
+                        pass
+                adjusted_width = min(max_length + 2, 50)
+                worksheet.column_dimensions[column_letter].width = adjusted_width
+            
+            # Summary sheet
+            summary_data = {
+                'Datei': [job['filename']],
+                'Verarbeitungsdatum': [job['created_at'].strftime('%d.%m.%Y %H:%M:%S')],
+                'Gesamte Adressen': [len(addresses)],
+                'Erfolgreich geocodiert': [sum(1 for addr in addresses if addr.get('geocoded', False))],
+                'Optimierung': ['Geografische Door-to-Door Route'],
+                'Gesamtstrecke (m)': [route_data.get('total_distance', 0)],
+                'Gesamtstrecke (km)': [round(route_data.get('total_distance', 0) / 1000, 2)]
+            }
+            
+            summary_df = pd.DataFrame(summary_data)
+            summary_df.to_excel(writer, sheet_name='Zusammenfassung', index=False)
+            
+            # Style summary sheet
+            summary_ws = writer.sheets['Zusammenfassung']
+            for cell in summary_ws[1]:
+                cell.fill = header_fill
+                cell.font = header_font
+            
+            for column in summary_ws.columns:
+                max_length = 0
+                column_letter = column[0].column_letter
+                for cell in column:
+                    try:
+                        if len(str(cell.value)) > max_length:
+                            max_length = len(str(cell.value))
+                    except:
+                        pass
+                adjusted_width = min(max_length + 2, 50)
+                summary_ws.column_dimensions[column_letter].width = adjusted_width
+        
+        output.seek(0)
+        
+        # Prepare filename
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"geografisch_optimiert_{timestamp}.xlsx"
+        
+        return StreamingResponse(
+            BytesIO(output.read()),
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": f"attachment; filename={filename}"}
+        )
+        
+    except Exception as e:
+        print(f"Error exporting optimized route: {e}")
+        raise HTTPException(status_code=500, detail=f"Fehler beim Excel-Export: {str(e)}")
 async def export_street_sorted_route(job_id: str):
     """Export street-sorted addresses as Excel file"""
     try:
