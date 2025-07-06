@@ -422,7 +422,7 @@ function App() {
     }
   };
 
-  // Sofortiger Upload-Handler
+  // Upload-Handler für kombinierte geografische Optimierung
   const handleInstantUpload = () => {
     if (!selectedFile) return;
     
@@ -432,22 +432,18 @@ function App() {
     setFilePreview(null);
     setUploadProgress(0);
     
-    // Upload-Prozess basierend auf Sortier-Modus starten
-    if (sortingMode === 'street_sorting') {
-      performStreetSortingUpload();
-    } else {
-      performUpload();
-    }
+    // Upload-Prozess starten - jetzt nur noch eine Funktion
+    performOptimizedUpload();
   };
 
-  const performStreetSortingUpload = async () => {
+  const performOptimizedUpload = async () => {
     const formData = new FormData();
     formData.append('file', selectedFile);
 
     try {
       setUploadProgress(10);
       
-      const response = await fetch(`${BACKEND_URL}/api/upload-street-sorted`, {
+      const response = await fetch(`${BACKEND_URL}/api/upload-optimized`, {
         method: 'POST',
         body: formData,
       });
@@ -479,8 +475,8 @@ function App() {
         setUploadProgress(0);
       }
     } catch (error) {
-      console.error('Error uploading file for street sorting:', error);
-      alert('Fehler beim Upload der Datei für Straßen-Sortierung');
+      console.error('Error uploading file for optimization:', error);
+      alert('Fehler beim Upload der Datei für Optimierung');
       setUploadStatus('idle');
       setShowPreview(true);
       setUploadProgress(0);
