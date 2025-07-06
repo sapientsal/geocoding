@@ -623,6 +623,217 @@ def test_street_based_sorting():
         log_test("Street-Based Sorting", f"Street-based sorting testing failed with error: {str(e)}", False)
         return None
 
+def test_specific_street_sorting():
+    """Test street-based sorting with specific test cases"""
+    print("\n🔍 Testing Street-Based Sorting with Specific Test Cases...")
+    
+    try:
+        # Read the specific street sorting test addresses file
+        with open('/app/street_sorting_test_specific.csv', 'r') as f:
+            csv_content = f.read()
+        
+        print(f"Loaded specific street sorting test addresses file:")
+        print(csv_content)
+        
+        # Create file-like object for upload
+        files = {
+            'file': ('street_sorting_test_specific.csv', csv_content, 'text/csv')
+        }
+        
+        # Upload file to street-sorted endpoint
+        response = requests.post(f"{BACKEND_URL}/upload-street-sorted", files=files)
+        
+        if response.status_code == 200:
+            job_id = response.json().get("job_id")
+            log_test("Street-Based Sorting", f"Specific test file uploaded successfully for street-based sorting. Job ID: {job_id}")
+            
+            # Wait for job to complete
+            max_attempts = 30
+            polling_interval = 5
+            
+            for attempt in range(max_attempts):
+                print(f"Polling job status (attempt {attempt+1}/{max_attempts})...")
+                response = requests.get(f"{BACKEND_URL}/job/{job_id}")
+                
+                if response.status_code != 200:
+                    log_test("Street-Based Sorting", f"Failed to get job status. Status code: {response.status_code}", False)
+                    return None
+                
+                job_data = response.json()
+                status = job_data.get("status")
+                
+                print(f"Current job status: {status}")
+                print(f"Processed: {job_data.get('processed_addresses')}/{job_data.get('total_addresses')}")
+                
+                # Check if job is completed or failed
+                if status == "completed":
+                    log_test("Street-Based Sorting", f"Job completed successfully. Processed {job_data.get('processed_addresses')} addresses.")
+                    break
+                elif status == "error":
+                    log_test("Street-Based Sorting", f"Job failed with error: {job_data.get('error_message')}", False)
+                    return None
+                
+                # Wait before next polling attempt
+                time.sleep(polling_interval)
+            
+            # Test retrieving the sorted data
+            print("Testing /api/street-sorted/{job_id} endpoint...")
+            response = requests.get(f"{BACKEND_URL}/street-sorted/{job_id}")
+            
+            if response.status_code != 200:
+                log_test("Street-Based Sorting", f"Failed to get street-sorted data. Status code: {response.status_code}", False)
+                print(f"Response: {response.text}")
+            else:
+                sorted_data = response.json()
+                sorted_addresses = sorted_data.get("sorted_addresses", [])
+                
+                if not sorted_addresses:
+                    log_test("Street-Based Sorting", "No sorted addresses found in response", False)
+                else:
+                    log_test("Street-Based Sorting", f"Successfully retrieved {len(sorted_addresses)} sorted addresses")
+                    
+                    # Print all addresses to see the actual format
+                    print("\nAll addresses in sorted order:")
+                    for i, addr in enumerate(sorted_addresses):
+                        original_address = addr.get("original_address", "")
+                        print(f"{i+1}. {original_address}")
+                    
+                    # Extract the original row data to analyze the sorting
+                    print("\nAnalyzing original row data for sorting:")
+                    street_groups = {}
+                    
+                    for addr in sorted_addresses:
+                        row_data = addr.get("row_data", {})
+                        if not row_data:
+                            continue
+                            
+                        street = row_data.get("Projektname Strasse", "")
+                        house_num = row_data.get("Hausnummer", "")
+                        zusatz = row_data.get("Zusatz", "")
+                        
+                        if street not in street_groups:
+                            street_groups[street] = []
+                            
+                        # Convert house number to numeric for sorting check
+                        try:
+                            house_num_numeric = int(house_num)
+                        except (ValueError, TypeError):
+                            house_num_numeric = 0
+                            
+                        # Adjust for letter suffixes (e.g., 10A)
+                        if zusatz and str(zusatz).strip():
+                            house_num_display = f"{house_num}{zusatz}"
+                        else:
+                            house_num_display = house_num
+                            
+                        street_groups[street].append({
+                            "street": street,
+                            "house_num": house_num_numeric,
+                            "house_num_display": house_num_display,
+                            "zusatz": zusatz,
+                            "index": len(street_groups[street])
+                        })
+                    
+                    # Print the street grouping results
+                    print("\nStreet grouping results:")
+                    for street, addresses in street_groups.items():
+                        print(f"\n{street} - {len(addresses)} addresses:")
+                        for addr in addresses:
+                            print(f"  - {addr['street']} {addr['house_num_display']}")
+                    
+                    # Check if streets are grouped together
+                    consecutive_indices = True
+                    for street, addresses in street_groups.items():
+                        if len(addresses) <= 1:
+                            continue
+                            
+                        # Get the indices in the original sorted list
+                        indices = [i for i, addr in enumerate(sorted_addresses) 
+                                  if addr.get("row_data", {}).get("Projektname Strasse") == street]
+                        
+                        # Check if indices are consecutive
+                        if max(indices) - min(indices) + 1 != len(indices):
+                            consecutive_indices = False
+                            log_test("Street-Based Sorting", 
+                                    f"Street '{street}' addresses are not consecutive in the sorted list. Indices: {indices}", False)
+                    
+                    if consecutive_indices:
+                        log_test("Street-Based Sorting", "All streets are properly grouped together")
+                    
+                    # Check if house numbers are sorted within each street
+                    house_numbers_sorted = True
+                    
+                    # Expected order for each street
+                    expected_orders = {
+                        "Am Hörenberg": ["1A", "3A", "3C", "4", "7", "8", "10"],
+                        "Albert-Schwedt-Weg": ["1", "2", "3", "5", "12"],
+                        "Am Bergerdorfer Schiffgraben": ["30", "34", "50", "64"]
+                    }
+                    
+                    for street, addresses in street_groups.items():
+                        if len(addresses) <= 1:
+                            continue
+                        
+                        # Get house numbers in the order they appear in the sorted list
+                        house_nums = []
+                        for i, addr in enumerate(sorted_addresses):
+                            row_data = addr.get("row_data", {})
+                            if row_data.get("Projektname Strasse") == street:
+                                house_num = row_data.get("Hausnummer", "")
+                                zusatz = row_data.get("Zusatz", "")
+                                if zusatz and str(zusatz).strip():
+                                    house_nums.append(f"{house_num}{zusatz}")
+                                else:
+                                    house_nums.append(f"{house_num}")
+                        
+                        print(f"\nHouse numbers for {street}: {house_nums}")
+                        
+                        # Check against expected order if available
+                        if street in expected_orders:
+                            expected = expected_orders[street]
+                            if house_nums != expected:
+                                house_numbers_sorted = False
+                                log_test("Street-Based Sorting", 
+                                        f"House numbers for '{street}' are not in expected order. Found: {house_nums}, Expected: {expected}", False)
+                            else:
+                                log_test("Street-Based Sorting", 
+                                        f"House numbers for '{street}' are correctly sorted: {house_nums}")
+                    
+                    if house_numbers_sorted:
+                        log_test("Street-Based Sorting", "House numbers within each street are properly sorted numerically")
+                    
+                    # Verify distance calculations
+                    has_distances = all("distance_to_next" in addr for addr in sorted_addresses[:-1])
+                    if has_distances:
+                        log_test("Street-Based Sorting", "Distance calculations are present for all addresses")
+                    else:
+                        log_test("Street-Based Sorting", "Distance calculations are missing for some addresses", False)
+            
+            # Test Excel export functionality
+            print("Testing /api/street-sorted/{job_id}/export endpoint...")
+            response = requests.get(f"{BACKEND_URL}/street-sorted/{job_id}/export")
+            
+            if response.status_code != 200:
+                log_test("Street-Based Sorting", f"Failed to export Excel file. Status code: {response.status_code}", False)
+                print(f"Response: {response.text}")
+            else:
+                content_type = response.headers.get('Content-Type')
+                content_disposition = response.headers.get('Content-Disposition')
+                
+                if content_type == 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' and 'attachment' in content_disposition:
+                    log_test("Street-Based Sorting", "Excel export functionality works correctly")
+                else:
+                    log_test("Street-Based Sorting", f"Excel export has incorrect headers. Content-Type: {content_type}, Content-Disposition: {content_disposition}", False)
+            
+            return job_id
+        else:
+            log_test("Street-Based Sorting", f"File upload failed with status code: {response.status_code}", False)
+            print(f"Response: {response.text}")
+            return None
+    except Exception as e:
+        log_test("Street-Based Sorting", f"Street-based sorting testing failed with error: {str(e)}", False)
+        return None
+
 def run_all_tests():
     """Run all tests in sequence"""
     print("\n🚀 Starting Sales Route Optimization Backend API Tests")
@@ -630,6 +841,12 @@ def run_all_tests():
     
     # Skip health check as it's not implemented
     print("\n🔍 Skipping health check endpoint (not implemented)")
+    
+    # Test specific street-based sorting
+    print("\n" + "=" * 80)
+    print("🛣️ Testing Specific Street-Based Sorting")
+    print("=" * 80)
+    specific_street_sorted_job_id = test_specific_street_sorting()
     
     # Test German address format processing
     print("\n" + "=" * 80)
