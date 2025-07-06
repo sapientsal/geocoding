@@ -618,13 +618,8 @@ function App() {
 
   const downloadExcel = async (jobId) => {
     try {
-      // Determine the correct endpoint based on job type
-      const job = jobs.find(j => j.id === jobId);
-      const endpoint = job?.sorting_type === 'street_based' 
-        ? `${BACKEND_URL}/api/street-sorted/${jobId}/export`
-        : `${BACKEND_URL}/api/route/${jobId}/export`;
-      
-      const response = await fetch(endpoint);
+      // Für die neue kombinierte Lösung verwenden wir nur noch den optimized endpoint
+      const response = await fetch(`${BACKEND_URL}/api/optimized/${jobId}/export`);
       
       if (response.ok) {
         const blob = await response.blob();
@@ -634,9 +629,7 @@ function App() {
         
         // Get filename from response headers or create default
         const contentDisposition = response.headers.get('Content-Disposition');
-        let filename = job?.sorting_type === 'street_based' 
-          ? `straßen_sortiert_${jobId}.xlsx`
-          : `optimized_route_${jobId}.xlsx`;
+        let filename = `geografisch_optimiert_${jobId}.xlsx`;
         
         if (contentDisposition) {
           const filenameMatch = contentDisposition.match(/filename="?([^"]*)"?/);
@@ -659,15 +652,15 @@ function App() {
     }
   };
 
-  const fetchStreetSortedRoute = async (jobId) => {
+  const fetchOptimizedRoute = async (jobId) => {
     try {
-      const response = await fetch(`${BACKEND_URL}/api/street-sorted/${jobId}`);
+      const response = await fetch(`${BACKEND_URL}/api/optimized/${jobId}`);
       const data = await response.json();
       
-      // Transform street-sorted data to be compatible with the existing route display
+      // Transform optimized data to be compatible with the existing route display
       const transformedData = {
         ...data,
-        optimized_addresses: data.sorted_addresses.map((addr, index) => ({
+        optimized_addresses: data.optimized_addresses.map((addr, index) => ({
           id: addr.id,
           original_address: addr.original_address,
           formatted_address: addr.formatted_address,
@@ -679,18 +672,18 @@ function App() {
           index: index
         })),
         job_id: jobId,
-        sorting_type: 'street_based'
+        optimization_type: 'geographic_door_to_door'
       };
       
       setRoute(transformedData);
       setShowRoute(true);
       
-      // Calculate distances for street-sorted route
-      if (data.sorted_addresses && data.sorted_addresses.length > 1) {
+      // Calculate distances for route visualization
+      if (data.optimized_addresses && data.optimized_addresses.length > 1) {
         const distances = [];
-        for (let i = 0; i < data.sorted_addresses.length - 1; i++) {
-          const current = data.sorted_addresses[i];
-          const next = data.sorted_addresses[i + 1];
+        for (let i = 0; i < data.optimized_addresses.length - 1; i++) {
+          const current = data.optimized_addresses[i];
+          const next = data.optimized_addresses[i + 1];
           
           if (current.latitude && current.longitude && next.latitude && next.longitude) {
             const distance = calculateDistance(
@@ -709,8 +702,8 @@ function App() {
         setRouteDistances(distances);
       }
     } catch (error) {
-      console.error('Error fetching street-sorted route:', error);
-      alert('Error fetching street-sorted route data');
+      console.error('Error fetching optimized route:', error);
+      alert('Error fetching route data');
     }
   };
 
