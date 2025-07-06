@@ -1714,8 +1714,245 @@ async def process_street_sorted_job(job_id: str, file_content: bytes, filename: 
             }}
         )
 
-# New endpoint for street-based sorting
-@app.post("/api/upload-street-sorted")
+# New unified upload endpoint for geographic optimization
+@app.post("/api/upload-optimized")
+async def upload_file_optimized(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
+    """Upload file for combined geographic optimization (door-to-door sales)"""
+    if not file.filename.lower().endswith(('.xlsx', '.xls', '.csv')):
+        raise HTTPException(status_code=400, detail="Nur Excel (.xlsx, .xls) und CSV Dateien sind erlaubt")
+    
+    try:
+        file_content = await file.read()
+        
+        # Create job
+        job_id = str(uuid.uuid4())
+        job_data = {
+            "id": job_id,
+            "filename": file.filename,
+            "status": "uploading",
+            "created_at": datetime.utcnow(),
+            "total_addresses": 0,
+            "processed_addresses": 0,
+            "geocoded_addresses": 0,
+            "optimization_type": "geographic_door_to_door"
+        }
+        
+        upload_jobs_collection.insert_one(job_data)
+        
+        # Start background processing
+        background_tasks.add_task(process_geographic_optimization_job, job_id, file_content, file.filename)
+        
+        return {"job_id": job_id, "status": "uploading", "message": "Datei wird für geografische Optimierung verarbeitet"}
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Fehler beim Upload: {str(e)}")
+
+async def process_geographic_optimization_job(job_id: str, file_content: bytes, filename: str):
+    """
+    Combined geographic optimization for door-to-door sales
+    - Geocodes all addresses
+    - Creates geographically logical route 
+    - Calculates exact distances
+    - Preserves all original columns
+    """
+    try:
+        # Update job status
+        upload_jobs_collection.update_one(
+            {"id": job_id},
+            {"$set": {"status": "parsing"}}
+        )
+        
+        # Parse file
+        try:
+            if filename.endswith('.csv'):
+                df = pd.read_csv(BytesIO(file_content), encoding='utf-8')
+            else:
+                try:
+                    df = pd.read_excel(BytesIO(file_content), engine='openpyxl')
+                except Exception:
+                    df = pd.read_excel(BytesIO(file_content), engine='xlrd')
+        except UnicodeDecodeError:
+            for encoding in ['latin-1', 'iso-8859-1', 'cp1252']:
+                try:
+                    df = pd.read_csv(BytesIO(file_content), encoding=encoding)
+                    break
+                except:
+                    continue
+            else:
+                raise ValueError("Datei-Encoding konnte nicht erkannt werden.")
+        except Exception as e:
+            upload_jobs_collection.update_one(
+                {"id": job_id},
+                {"$set": {"status": "error", "error_message": f"Datei konnte nicht gelesen werden: {str(e)}"}}
+            )
+            return
+        
+        # Detect address format and create address list
+        street_col = house_num_col = zusatz_col = plz_col = ort_col = None
+        
+        for col in df.columns:
+            col_lower = col.lower().strip()
+            if any(keyword in col_lower for keyword in ['projektname strasse', 'strasse', 'straße', 'street']):
+                street_col = col
+            elif any(keyword in col_lower for keyword in ['hausnummer', 'haus nummer', 'nummer', 'nr']):
+                house_num_col = col
+            elif any(keyword in col_lower for keyword in ['zusatz', 'zusätze']):
+                zusatz_col = col
+            elif any(keyword in col_lower for keyword in ['plz', 'postleitzahl', 'postal']):
+                plz_col = col
+            elif any(keyword in col_lower for keyword in ['ort', 'stadt', 'city', 'location']):
+                ort_col = col
+        
+        has_german_format = street_col and house_num_col and plz_col and ort_col
+        
+        # Create address strings for geocoding
+        addresses_to_geocode = []
+        if has_german_format:
+            for idx, row in df.iterrows():
+                street = str(row[street_col]).strip() if pd.notna(row[street_col]) else ""
+                house_num = str(row[house_num_col]).strip() if pd.notna(row[house_num_col]) else ""
+                zusatz = str(row[zusatz_col]).strip() if zusatz_col and pd.notna(row[zusatz_col]) else ""
+                plz = str(row[plz_col]).strip() if pd.notna(row[plz_col]) else ""
+                ort = str(row[ort_col]).strip() if pd.notna(row[ort_col]) else ""
+                
+                # Clean street name - remove project prefixes
+                if street.startswith('Worpswede '):
+                    street = street[10:].strip()
+                elif ' ' in street and len(street.split()[0]) < 4:
+                    parts = street.split()
+                    if parts[0].isalnum() and len(parts) > 1:
+                        street = ' '.join(parts[1:])
+                
+                # Combine address parts
+                if zusatz and zusatz != 'nan':
+                    address = f"{street} {house_num} {zusatz}, {plz} {ort}"
+                else:
+                    address = f"{street} {house_num}, {plz} {ort}"
+                
+                addresses_to_geocode.append(address.strip())
+        else:
+            # Look for single address column
+            address_column = None
+            for col in df.columns:
+                if any(keyword in col.lower() for keyword in ['address', 'adresse', 'addr']):
+                    address_column = col
+                    break
+            
+            if not address_column:
+                upload_jobs_collection.update_one(
+                    {"id": job_id},
+                    {"$set": {"status": "error", "error_message": "Keine Adress-Spalten gefunden"}}
+                )
+                return
+            
+            addresses_to_geocode = df[address_column].astype(str).tolist()
+        
+        # Update status and counts
+        total_addresses = len(addresses_to_geocode)
+        upload_jobs_collection.update_one(
+            {"id": job_id},
+            {"$set": {
+                "status": "geocoding",
+                "total_addresses": total_addresses,
+                "processed_addresses": 0,
+                "geocoded_addresses": 0
+            }}
+        )
+        
+        # Geocode all addresses
+        geocoded_data = []
+        geocoded_count = 0
+        
+        for i, address in enumerate(addresses_to_geocode):
+            try:
+                print(f"Geocoding address {i+1}/{total_addresses}: {address}")
+                geocoded = await geocode_address_with_cache(address)
+                geocoded_data.append(geocoded)
+                if geocoded.get('latitude') and geocoded.get('longitude'):
+                    geocoded_count += 1
+                    print(f"✅ Successfully geocoded: {address}")
+                else:
+                    print(f"❌ Failed to geocode: {address}")
+                
+                # Update progress
+                upload_jobs_collection.update_one(
+                    {"id": job_id},
+                    {"$set": {
+                        "processed_addresses": i + 1,
+                        "geocoded_addresses": geocoded_count
+                    }}
+                )
+                
+                # Rate limiting
+                await asyncio.sleep(0.3)
+                
+            except Exception as e:
+                print(f"Geocoding error for address {address}: {e}")
+                geocoded_data.append({})
+        
+        # Geographic optimization for door-to-door sales
+        upload_jobs_collection.update_one(
+            {"id": job_id},
+            {"$set": {"status": "optimizing"}}
+        )
+        
+        optimized_df, total_distance = optimize_geographic_route(df, geocoded_data, addresses_to_geocode)
+        
+        # Store results in database
+        optimized_addresses = []
+        for idx, row in optimized_df.iterrows():
+            # Convert any NaN or infinity values to None for JSON serialization
+            row_dict = {}
+            for k, v in row.to_dict().items():
+                if isinstance(v, float) and (pd.isna(v) or math.isinf(v)):
+                    row_dict[k] = None
+                else:
+                    row_dict[k] = v
+            
+            address_data = {
+                "id": str(uuid.uuid4()),
+                "original_address": row.get('original_address', ''),
+                "latitude": row.get('latitude'),
+                "longitude": row.get('longitude'),
+                "formatted_address": row.get('formatted_address', ''),
+                "geocoded": bool(row.get('latitude') and row.get('longitude')),
+                "distance_to_next": None if pd.isna(row.get('distance_to_next_m')) else row.get('distance_to_next_m'),
+                "row_data": row_dict
+            }
+            optimized_addresses.append(address_data)
+        
+        # Store in database
+        route_data = {
+            "job_id": job_id,
+            "optimized_addresses": optimized_addresses,
+            "total_distance": total_distance,
+            "created_at": datetime.utcnow(),
+            "optimization_type": "geographic_door_to_door"
+        }
+        
+        routes_collection.insert_one(route_data)
+        
+        # Update job as completed
+        upload_jobs_collection.update_one(
+            {"id": job_id},
+            {"$set": {
+                "status": "completed",
+                "geocoded_addresses": geocoded_count,
+                "completed_at": datetime.utcnow()
+            }}
+        )
+        
+        print(f"Geographic optimization job {job_id} completed successfully with {geocoded_count}/{total_addresses} geocoded addresses")
+        
+    except Exception as e:
+        print(f"Error in geographic optimization job {job_id}: {e}")
+        upload_jobs_collection.update_one(
+            {"id": job_id},
+            {"$set": {
+                "status": "error",
+                "error_message": str(e)
+            }}
+        )
 async def upload_file_street_sorted(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
     """Upload file for street-based address sorting"""
     if not file.filename.lower().endswith(('.xlsx', '.xls', '.csv')):
