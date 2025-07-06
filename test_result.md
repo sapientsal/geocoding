@@ -200,7 +200,7 @@ backend:
 
   - task: "Street-Based Sorting"
     implemented: true
-    working: false
+    working: true
     file: "server.py"
     stuck_count: 0
     priority: "high"
@@ -224,6 +224,9 @@ backend:
       - working: false
         agent: "testing"
         comment: "Tested with specific test cases as requested in the review. The street-based sorting is still not working correctly. While streets are grouped together, there are two issues: 1) Addresses from the same street are being split into separate groups (e.g., 'Am Hörenberg', 'Am Hörenberg 1', 'Am Hörenberg 3' are treated as different streets), and 2) House numbers within each street are not sorted correctly (e.g., Am Hörenberg house numbers appear as [4, 8, 7, 10] instead of [1A, 3A, 3C, 4, 7, 8, 10]). The street name extraction and house number sorting logic needs to be improved."
+      - working: true
+        agent: "testing"
+        comment: "Conducted comprehensive testing of the German address format cleaning logic and house number sorting. Created multiple test cases to verify the street name extraction from formats like '624 Worpswede Albert-Schwedt-Weg' correctly extracts 'Albert-Schwedt-Weg'. Also verified that house numbers within each street are properly sorted numerically with letter suffixes (e.g., [1A, 3A, 3C, 4, 7, 8, 10]). The clean_street_name function correctly handles German address formats by removing project codes and city prefixes. The extract_house_number_parts function properly extracts numeric and alphabetic parts from house numbers for correct sorting. All tests passed, confirming that the street-based sorting functionality is now working correctly."
 
 frontend:
   - task: "File Upload Interface"
