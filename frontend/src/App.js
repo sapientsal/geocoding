@@ -1086,17 +1086,14 @@ function App() {
                   <div className="flex justify-between items-start mb-4">
                     <div>
                       <h3 className="text-lg font-semibold text-gray-800 flex items-center">
-                        {job.sorting_type === 'street_based' ? (
-                          <>📍 {job.filename}</>
-                        ) : (
-                          <>🚀 {job.filename}</>
-                        )}
+                        <span className="mr-2">🗺️</span>
+                        {job.filename}
                       </h3>
                       <p className="text-sm text-gray-500">
                         Hochgeladen: {new Date(job.created_at).toLocaleDateString('de-DE')}
                       </p>
                       <p className="text-xs text-blue-600 font-medium">
-                        {job.sorting_type === 'street_based' ? 'Straßen-sortiert' : 'Route-optimiert'}
+                        Geografische Door-to-Door Optimierung
                       </p>
                       {job.status === 'completed' && job.completed_at && (
                         <p className="text-sm text-green-600">
