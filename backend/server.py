@@ -433,16 +433,28 @@ def optimize_geographic_route(df, geocoded_data, addresses_to_geocode):
             
             street = str(street_name).strip()
             
-            # Remove specific project prefixes
+            # Handle German address format: "624 Worpswede Albert-Schwedt-Weg"
+            # Remove project code and city prefix
+            parts = street.split()
+            if len(parts) >= 3:
+                # Check if first part is numeric (project code)
+                if parts[0].isdigit():
+                    # Remove first part (project code)
+                    remaining = ' '.join(parts[1:])
+                    
+                    # Check if second part is a city name like "Worpswede"
+                    if len(parts) >= 3 and parts[1].isalpha():
+                        # Remove city name too, keep only street name
+                        street = ' '.join(parts[2:])
+                    else:
+                        street = remaining
+                elif parts[0].isalpha() and len(parts) >= 2:
+                    # If first part is alpha (like "Worpswede"), remove it
+                    street = ' '.join(parts[1:])
+            
+            # Additional cleanup for common prefixes
             if street.startswith('Worpswede '):
                 street = street[10:].strip()
-            
-            # Remove other short prefixes
-            parts = street.split()
-            if len(parts) > 1 and len(parts[0]) <= 4 and parts[0].isalnum():
-                remaining = ' '.join(parts[1:])
-                if any(char.isalpha() for char in remaining):
-                    street = remaining
             
             return street.strip()
         
