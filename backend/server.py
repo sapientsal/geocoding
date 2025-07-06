@@ -389,6 +389,100 @@ def haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> fl
     
     return R * c
 
+def optimize_geographic_route(df, geocoded_data, addresses_to_geocode):
+    """
+    Optimize route geographically for door-to-door sales
+    - Groups nearby addresses by geographic proximity  
+    - Creates logical walking/driving routes
+    - Calculates exact distances between consecutive stops
+    """
+    print("Starting geographic route optimization for door-to-door sales...")
+    
+    # Create working dataframe with geocoded data
+    working_df = df.copy()
+    working_df['original_address'] = addresses_to_geocode
+    
+    # Add geocoded coordinates
+    for i, geocoded in enumerate(geocoded_data):
+        if i < len(working_df):
+            working_df.loc[i, 'latitude'] = geocoded.get('latitude')
+            working_df.loc[i, 'longitude'] = geocoded.get('longitude')
+            working_df.loc[i, 'formatted_address'] = geocoded.get('formatted_address', '')
+    
+    # Filter addresses that have valid coordinates
+    valid_addresses = working_df.dropna(subset=['latitude', 'longitude']).copy()
+    invalid_addresses = working_df[working_df['latitude'].isna() | working_df['longitude'].isna()].copy()
+    
+    if len(valid_addresses) == 0:
+        print("No valid geocoded addresses for optimization")
+        working_df['distance_to_next_m'] = None
+        return working_df, 0
+    
+    print(f"Optimizing route for {len(valid_addresses)} valid addresses...")
+    
+    # Simple geographic optimization using nearest neighbor approach
+    # Start from the first address
+    route_order = []
+    remaining_indices = list(valid_addresses.index)
+    current_index = remaining_indices[0]
+    remaining_indices.remove(current_index)
+    route_order.append(current_index)
+    
+    # Build route by always going to nearest unvisited address
+    while remaining_indices:
+        current_lat = valid_addresses.loc[current_index, 'latitude']
+        current_lon = valid_addresses.loc[current_index, 'longitude']
+        
+        min_distance = float('inf')
+        next_index = None
+        
+        for candidate_index in remaining_indices:
+            candidate_lat = valid_addresses.loc[candidate_index, 'latitude']
+            candidate_lon = valid_addresses.loc[candidate_index, 'longitude']
+            
+            distance = calculate_distance_meters(current_lat, current_lon, candidate_lat, candidate_lon)
+            if distance < min_distance:
+                min_distance = distance
+                next_index = candidate_index
+        
+        if next_index is not None:
+            route_order.append(next_index)
+            remaining_indices.remove(next_index)
+            current_index = next_index
+    
+    # Create optimized dataframe
+    optimized_valid = valid_addresses.loc[route_order].copy()
+    
+    # Calculate distances between consecutive addresses
+    distances = []
+    total_distance = 0
+    
+    for i in range(len(optimized_valid)):
+        if i < len(optimized_valid) - 1:
+            current_row = optimized_valid.iloc[i]
+            next_row = optimized_valid.iloc[i + 1]
+            
+            distance = calculate_distance_meters(
+                current_row['latitude'], current_row['longitude'],
+                next_row['latitude'], next_row['longitude']
+            )
+            distances.append(round(distance) if distance else 0)
+            total_distance += distance if distance else 0
+        else:
+            distances.append(None)  # Last address has no next address
+    
+    optimized_valid['distance_to_next_m'] = distances
+    
+    # Add invalid addresses at the end
+    if len(invalid_addresses) > 0:
+        invalid_addresses['distance_to_next_m'] = None
+        optimized_df = pd.concat([optimized_valid, invalid_addresses], ignore_index=True)
+    else:
+        optimized_df = optimized_valid
+    
+    print(f"Route optimization completed. Total distance: {total_distance/1000:.2f} km")
+    
+    return optimized_df, total_distance
 def calculate_distance_meters(lat1: float, lon1: float, lat2: float, lon2: float) -> Optional[float]:
     """Calculate distance between two points in meters using Haversine formula"""
     if not all([lat1, lon1, lat2, lon2]):
