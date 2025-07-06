@@ -392,8 +392,9 @@ def haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> fl
 def optimize_geographic_route(df, geocoded_data, addresses_to_geocode):
     """
     Optimize route geographically for door-to-door sales
-    - Groups nearby addresses by geographic proximity  
-    - Creates logical walking/driving routes
+    - Groups addresses by street name first
+    - Sorts house numbers numerically within each street
+    - Optimizes route between street groups geographically
     - Calculates exact distances between consecutive stops
     """
     print("Starting geographic route optimization for door-to-door sales...")
@@ -409,78 +410,219 @@ def optimize_geographic_route(df, geocoded_data, addresses_to_geocode):
             working_df.loc[i, 'longitude'] = geocoded.get('longitude')
             working_df.loc[i, 'formatted_address'] = geocoded.get('formatted_address', '')
     
-    # Filter addresses that have valid coordinates
-    valid_addresses = working_df.dropna(subset=['latitude', 'longitude']).copy()
-    invalid_addresses = working_df[working_df['latitude'].isna() | working_df['longitude'].isna()].copy()
+    # Detect street and house number columns for proper sorting
+    street_col = house_num_col = None
     
-    if len(valid_addresses) == 0:
-        print("No valid geocoded addresses for optimization")
-        working_df['distance_to_next_m'] = None
-        return working_df, 0
+    for col in working_df.columns:
+        col_lower = col.lower().strip()
+        if any(keyword in col_lower for keyword in ['projektname strasse', 'strasse', 'straße', 'street']):
+            street_col = col
+        elif any(keyword in col_lower for keyword in ['hausnummer', 'haus nummer', 'nummer', 'nr']):
+            house_num_col = col
     
-    print(f"Optimizing route for {len(valid_addresses)} valid addresses...")
+    print(f"Detected columns - Street: {street_col}, House Number: {house_num_col}")
     
-    # Simple geographic optimization using nearest neighbor approach
-    # Start from the first address
-    route_order = []
-    remaining_indices = list(valid_addresses.index)
-    current_index = remaining_indices[0]
-    remaining_indices.remove(current_index)
-    route_order.append(current_index)
-    
-    # Build route by always going to nearest unvisited address
-    while remaining_indices:
-        current_lat = valid_addresses.loc[current_index, 'latitude']
-        current_lon = valid_addresses.loc[current_index, 'longitude']
+    # If we have street and house number columns, do street-based sorting first
+    if street_col and house_num_col:
+        print("Applying street-based sorting with numeric house numbers...")
         
-        min_distance = float('inf')
-        next_index = None
-        
-        for candidate_index in remaining_indices:
-            candidate_lat = valid_addresses.loc[candidate_index, 'latitude']
-            candidate_lon = valid_addresses.loc[candidate_index, 'longitude']
+        # Clean street names
+        def clean_street_name(street_name):
+            if pd.isna(street_name) or str(street_name).strip() == '':
+                return ''
             
-            distance = calculate_distance_meters(current_lat, current_lon, candidate_lat, candidate_lon)
-            if distance < min_distance:
-                min_distance = distance
-                next_index = candidate_index
+            street = str(street_name).strip()
+            
+            # Remove specific project prefixes
+            if street.startswith('Worpswede '):
+                street = street[10:].strip()
+            
+            # Remove other short prefixes
+            parts = street.split()
+            if len(parts) > 1 and len(parts[0]) <= 4 and parts[0].isalnum():
+                remaining = ' '.join(parts[1:])
+                if any(char.isalpha() for char in remaining):
+                    street = remaining
+            
+            return street.strip()
         
-        if next_index is not None:
-            route_order.append(next_index)
-            remaining_indices.remove(next_index)
-            current_index = next_index
-    
-    # Create optimized dataframe
-    optimized_valid = valid_addresses.loc[route_order].copy()
+        working_df['street_clean'] = working_df[street_col].apply(clean_street_name)
+        
+        # Extract house number parts for proper numeric sorting
+        house_number_data = []
+        for idx, value in working_df[house_num_col].items():
+            try:
+                numeric, letter = extract_house_number_parts(value)
+                house_number_data.append((numeric, letter))
+            except Exception as e:
+                print(f"Error processing house number '{value}': {e}")
+                house_number_data.append((0, ''))
+        
+        working_df['house_number_numeric'] = [data[0] for data in house_number_data]
+        working_df['house_number_letter'] = [data[1] for data in house_number_data]
+        
+        # Fill NaN values
+        working_df['street_clean'] = working_df['street_clean'].fillna('')
+        working_df['house_number_numeric'] = working_df['house_number_numeric'].fillna(0)
+        working_df['house_number_letter'] = working_df['house_number_letter'].fillna('')
+        
+        # Sort by street FIRST, then house number SECOND
+        try:
+            working_df_sorted = working_df.sort_values([
+                'street_clean',           # PRIMARY: Group by street
+                'house_number_numeric',   # SECONDARY: Numeric house number
+                'house_number_letter'     # TERTIARY: Letter suffix
+            ], na_position='last')
+            
+            print("Street-based sorting completed. Sample of sorted addresses:")
+            for i in range(min(15, len(working_df_sorted))):
+                row = working_df_sorted.iloc[i]
+                house_display = f"{int(row['house_number_numeric'])}{row['house_number_letter']}" if row['house_number_numeric'] > 0 else "?"
+                print(f"  {i+1:2d}. {row['street_clean']:<25} {house_display}")
+                
+        except Exception as e:
+            print(f"Error during street-based sorting: {e}")
+            working_df_sorted = working_df
+        
+        # Now apply geographic optimization between street groups
+        print("Applying geographic optimization between street groups...")
+        
+        # Group by street and get the center coordinates for each street
+        street_groups = []
+        street_centers = {}
+        
+        for street_name in working_df_sorted['street_clean'].unique():
+            if street_name == '':
+                continue
+                
+            street_addresses = working_df_sorted[working_df_sorted['street_clean'] == street_name]
+            valid_coords = street_addresses.dropna(subset=['latitude', 'longitude'])
+            
+            if len(valid_coords) > 0:
+                # Calculate center of street
+                center_lat = valid_coords['latitude'].mean()
+                center_lon = valid_coords['longitude'].mean()
+                street_centers[street_name] = (center_lat, center_lon)
+                street_groups.append((street_name, street_addresses))
+        
+        # Sort street groups by geographic proximity
+        if len(street_groups) > 1:
+            print(f"Optimizing route between {len(street_groups)} street groups...")
+            
+            # Start with first street
+            optimized_street_order = [street_groups[0]]
+            remaining_streets = street_groups[1:]
+            current_street = street_groups[0][0]
+            
+            # Use nearest neighbor to order streets
+            while remaining_streets:
+                current_center = street_centers[current_street]
+                
+                min_distance = float('inf')
+                next_street_idx = 0
+                
+                for i, (street_name, _) in enumerate(remaining_streets):
+                    street_center = street_centers[street_name]
+                    distance = calculate_distance_meters(
+                        current_center[0], current_center[1],
+                        street_center[0], street_center[1]
+                    )
+                    if distance < min_distance:
+                        min_distance = distance
+                        next_street_idx = i
+                
+                next_street = remaining_streets.pop(next_street_idx)
+                optimized_street_order.append(next_street)
+                current_street = next_street[0]
+            
+            # Rebuild the dataframe in optimized street order
+            optimized_parts = []
+            for street_name, street_addresses in optimized_street_order:
+                optimized_parts.append(street_addresses)
+            
+            optimized_df = pd.concat(optimized_parts, ignore_index=True) if optimized_parts else working_df_sorted
+        else:
+            optimized_df = working_df_sorted
+            
+    else:
+        # Fallback to basic geographic optimization if no street columns detected
+        print("No street columns detected, using basic geographic optimization...")
+        valid_addresses = working_df.dropna(subset=['latitude', 'longitude']).copy()
+        invalid_addresses = working_df[working_df['latitude'].isna() | working_df['longitude'].isna()].copy()
+        
+        if len(valid_addresses) == 0:
+            optimized_df = working_df
+        else:
+            # Simple nearest neighbor optimization
+            route_order = []
+            remaining_indices = list(valid_addresses.index)
+            current_index = remaining_indices[0]
+            remaining_indices.remove(current_index)
+            route_order.append(current_index)
+            
+            while remaining_indices:
+                current_lat = valid_addresses.loc[current_index, 'latitude']
+                current_lon = valid_addresses.loc[current_index, 'longitude']
+                
+                min_distance = float('inf')
+                next_index = None
+                
+                for candidate_index in remaining_indices:
+                    candidate_lat = valid_addresses.loc[candidate_index, 'latitude']
+                    candidate_lon = valid_addresses.loc[candidate_index, 'longitude']
+                    
+                    distance = calculate_distance_meters(current_lat, current_lon, candidate_lat, candidate_lon)
+                    if distance < min_distance:
+                        min_distance = distance
+                        next_index = candidate_index
+                
+                if next_index is not None:
+                    route_order.append(next_index)
+                    remaining_indices.remove(next_index)
+                    current_index = next_index
+            
+            optimized_valid = valid_addresses.loc[route_order].copy()
+            
+            if len(invalid_addresses) > 0:
+                optimized_df = pd.concat([optimized_valid, invalid_addresses], ignore_index=True)
+            else:
+                optimized_df = optimized_valid
     
     # Calculate distances between consecutive addresses
     distances = []
     total_distance = 0
     
-    for i in range(len(optimized_valid)):
-        if i < len(optimized_valid) - 1:
-            current_row = optimized_valid.iloc[i]
-            next_row = optimized_valid.iloc[i + 1]
-            
-            distance = calculate_distance_meters(
-                current_row['latitude'], current_row['longitude'],
-                next_row['latitude'], next_row['longitude']
-            )
-            distances.append(round(distance) if distance else 0)
-            total_distance += distance if distance else 0
+    for i in range(len(optimized_df)):
+        if i < len(optimized_df) - 1:
+            try:
+                current_row = optimized_df.iloc[i]
+                next_row = optimized_df.iloc[i + 1]
+                
+                current_lat = current_row.get('latitude')
+                current_lon = current_row.get('longitude')
+                next_lat = next_row.get('latitude')
+                next_lon = next_row.get('longitude')
+                
+                if (current_lat is not None and current_lon is not None and
+                    next_lat is not None and next_lon is not None and
+                    not pd.isna(current_lat) and not pd.isna(current_lon) and
+                    not pd.isna(next_lat) and not pd.isna(next_lon)):
+                    distance = calculate_distance_meters(current_lat, current_lon, next_lat, next_lon)
+                    distances.append(round(distance) if distance else 0)
+                    total_distance += distance if distance else 0
+                else:
+                    distances.append(None)
+            except Exception as e:
+                print(f"Error calculating distance for row {i}: {e}")
+                distances.append(None)
         else:
             distances.append(None)  # Last address has no next address
     
-    optimized_valid['distance_to_next_m'] = distances
+    optimized_df['distance_to_next_m'] = distances
     
-    # Add invalid addresses at the end
-    if len(invalid_addresses) > 0:
-        invalid_addresses['distance_to_next_m'] = None
-        optimized_df = pd.concat([optimized_valid, invalid_addresses], ignore_index=True)
-    else:
-        optimized_df = optimized_valid
-    
-    print(f"Route optimization completed. Total distance: {total_distance/1000:.2f} km")
+    print(f"Route optimization completed.")
+    print(f"Total distance: {total_distance/1000:.2f} km")
+    print(f"Average distance between stops: {(total_distance/len([d for d in distances if d]))/1000:.3f} km" if any(distances) else "No valid distances")
     
     return optimized_df, total_distance
 def calculate_distance_meters(lat1: float, lon1: float, lat2: float, lon2: float) -> Optional[float]:
