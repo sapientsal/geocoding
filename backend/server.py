@@ -101,61 +101,11 @@ try:
     client.admin.command('ismaster')
     
     db = client['sales_routes']
+    # Database collections
     addresses_collection = db['addresses']
     routes_collection = db['routes']
     upload_jobs_collection = db['upload_jobs']
-
-    # Global variables for caching and monitoring
-    address_cache = {}
-    active_jobs = {}
-    job_logs = {}
-
-    class JobLogger:
-        """Centralized logging for jobs with frontend visibility"""
-        
-        def __init__(self, job_id):
-            self.job_id = job_id
-            self.logs = []
-            self.start_time = datetime.utcnow()
-            
-        def log(self, level, message, address_index=None, address=None):
-            """Add a log entry"""
-            timestamp = datetime.utcnow()
-            log_entry = {
-                "timestamp": timestamp.isoformat(),
-                "level": level,  # INFO, WARNING, ERROR, CRITICAL
-                "message": message,
-                "address_index": address_index,
-                "address": address,
-                "elapsed_time": (timestamp - self.start_time).total_seconds()
-            }
-            self.logs.append(log_entry)
-            
-            # Keep only last 1000 log entries to prevent memory issues
-            if len(self.logs) > 1000:
-                self.logs = self.logs[-1000:]
-            
-            # Update job logs in global storage
-            job_logs[self.job_id] = self.logs
-            
-            print(f"[{level}] Job {self.job_id}: {message}")
-            
-        def get_logs(self):
-            """Get all logs for this job"""
-            return self.logs
-        
-        def get_recent_logs(self, count=50):
-            """Get recent logs"""
-            return self.logs[-count:] if self.logs else []
-
-    def cleanup_job_monitoring(job_id):
-        """Clean up job monitoring resources"""
-        if job_id in active_jobs:
-            del active_jobs[job_id]
-        if job_id in job_logs:
-            # Keep logs for 24 hours for debugging
-            # In production, you might want to move this to a persistent storage
-            pass
+    
     print("✅ MongoDB connection successful")
 except Exception as e:
     print(f"❌ MongoDB connection failed: {e}")
