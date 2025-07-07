@@ -285,9 +285,8 @@ metadata:
 
 test_plan:
   current_focus:
-    - "Street-Based Sorting"
-  stuck_tasks:
-    - "Street-Based Sorting"
+    - "Enhanced Geocoding Robustness"
+  stuck_tasks: []
   test_all: false
   test_priority: "high_first"
 
