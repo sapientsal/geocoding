@@ -167,6 +167,8 @@ function App() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [currentMapLayer, setCurrentMapLayer] = useState('standard');
   const [routeDistances, setRouteDistances] = useState([]);
+  const [jobLogs, setJobLogs] = useState([]);
+  const [showLogs, setShowLogs] = useState(false);
   const mapRef = useRef(null);
 
   // Fetch jobs on component mount
