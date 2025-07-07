@@ -2011,6 +2011,8 @@ async def robust_geocode_with_monitoring(address: str, logger: JobLogger, addres
             'geocoded': False,
             'error': error_msg
         }
+
+@app.post("/api/upload-optimized")
 async def upload_file_optimized(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
     """Upload file for combined geographic optimization (door-to-door sales)"""
     if not file.filename.lower().endswith(('.xlsx', '.xls', '.csv')):
