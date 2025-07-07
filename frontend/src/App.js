@@ -1006,12 +1006,25 @@ function App() {
               <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(jobStatus.status)}`}>
                 {jobStatus.status === 'completed' ? 'Abgeschlossen' :
                  jobStatus.status === 'error' ? 'Fehler' :
-                 jobStatus.status === 'geocoding' ? 'Geocodierung läuft' :
+                 jobStatus.status === 'geocoding' ? `Geocodierung läuft (${jobStatus.progress_percentage || 0}%)` :
                  jobStatus.status === 'optimizing' ? 'Route wird optimiert' :
                  jobStatus.status === 'sorting' ? 'Straßen-Sortierung läuft' :
                  jobStatus.status === 'parsing' ? 'Datei wird gelesen' :
+                 jobStatus.status === 'resuming' ? 'Wird fortgesetzt' :
                  jobStatus.status === 'uploading' ? 'Upload läuft' : jobStatus.status}
               </span>
+              {jobStatus.can_resume && jobStatus.status === 'error' && (
+                <button
+                  onClick={() => {
+                    // Resume functionality could be added here
+                    alert('Resume-Funktion: Bitte laden Sie die Datei erneut hoch, um fortzufahren.');
+                  }}
+                  className="ml-2 px-2 py-1 bg-yellow-600 text-white text-xs rounded hover:bg-yellow-700 transition-colors"
+                  title="Job fortsetzen"
+                >
+                  🔄 Fortsetzen
+                </button>
+              )}
             </div>
             
             <div className="space-y-4">
