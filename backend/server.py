@@ -20,6 +20,9 @@ import urllib.parse
 from concurrent.futures import ThreadPoolExecutor
 import openpyxl
 from openpyxl.styles import PatternFill, Font
+import signal
+import threading
+import traceback
 from openpyxl.utils.dataframe import dataframe_to_rows
 
 app = FastAPI(
