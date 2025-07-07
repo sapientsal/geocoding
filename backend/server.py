@@ -2057,36 +2057,97 @@ async def process_geographic_optimization_job(job_id: str, file_content: bytes, 
             }}
         )
         
-        # Geocode all addresses
+        # Geocode all addresses with enhanced batch processing
         geocoded_data = []
         geocoded_count = 0
+        failed_count = 0
+        batch_size = 50  # Process in smaller batches to avoid memory issues
         
-        for i, address in enumerate(addresses_to_geocode):
-            try:
-                print(f"Geocoding address {i+1}/{total_addresses}: {address}")
-                geocoded = await geocode_address_with_cache(address)
-                geocoded_data.append(geocoded)
-                if geocoded.get('latitude') and geocoded.get('longitude'):
-                    geocoded_count += 1
-                    print(f"✅ Successfully geocoded: {address}")
-                else:
-                    print(f"❌ Failed to geocode: {address}")
+        print(f"Starting geocoding of {total_addresses} addresses in batches of {batch_size}...")
+        
+        for batch_start in range(0, total_addresses, batch_size):
+            batch_end = min(batch_start + batch_size, total_addresses)
+            print(f"Processing batch {batch_start + 1}-{batch_end} of {total_addresses}")
+            
+            for i in range(batch_start, batch_end):
+                address = addresses_to_geocode[i]
                 
-                # Update progress
-                upload_jobs_collection.update_one(
-                    {"id": job_id},
-                    {"$set": {
-                        "processed_addresses": i + 1,
-                        "geocoded_addresses": geocoded_count
-                    }}
-                )
-                
-                # Rate limiting
-                await asyncio.sleep(0.3)
-                
-            except Exception as e:
-                print(f"Geocoding error for address {address}: {e}")
-                geocoded_data.append({})
+                try:
+                    print(f"Geocoding address {i+1}/{total_addresses}: {address}")
+                    geocoded = await geocode_address_with_cache(address)
+                    geocoded_data.append(geocoded)
+                    
+                    if geocoded.get('latitude') and geocoded.get('longitude'):
+                        geocoded_count += 1
+                        print(f"✅ Successfully geocoded: {address}")
+                    else:
+                        failed_count += 1
+                        print(f"❌ Failed to geocode: {address} - {geocoded.get('error', 'Unknown error')}")
+                    
+                    # Update progress more frequently
+                    if (i + 1) % 10 == 0 or i == total_addresses - 1:
+                        upload_jobs_collection.update_one(
+                            {"id": job_id},
+                            {"$set": {
+                                "processed_addresses": i + 1,
+                                "geocoded_addresses": geocoded_count,
+                                "failed_addresses": failed_count
+                            }}
+                        )
+                    
+                    # Enhanced rate limiting with adaptive delays
+                    if failed_count > 5 and (failed_count / max(i + 1, 1)) > 0.5:
+                        # If failure rate is high, slow down
+                        await asyncio.sleep(1.0)
+                    elif geocoded_count > 0 and (geocoded_count / max(i + 1, 1)) > 0.8:
+                        # If success rate is high, speed up a bit
+                        await asyncio.sleep(0.2)
+                    else:
+                        # Normal rate
+                        await asyncio.sleep(0.4)
+                    
+                    # Memory management: Clear cache periodically for very large datasets
+                    if i > 0 and i % 1000 == 0:
+                        print(f"Memory management: Clearing old cache entries at address {i}")
+                        # Keep only recent entries in cache
+                        if len(address_cache) > 2000:
+                            # Clear oldest half of cache
+                            keys_to_remove = list(address_cache.keys())[:len(address_cache)//2]
+                            for key in keys_to_remove:
+                                del address_cache[key]
+                            print(f"Cleared {len(keys_to_remove)} old cache entries")
+                    
+                except Exception as e:
+                    print(f"Critical error processing address {i+1}: {address} - {e}")
+                    geocoded_data.append({
+                        'latitude': None,
+                        'longitude': None,
+                        'formatted_address': address,
+                        'geocoded': False,
+                        'error': str(e)
+                    })
+                    failed_count += 1
+                    
+                    # Continue processing even if one address fails
+                    continue
+            
+            # Update progress after each batch
+            upload_jobs_collection.update_one(
+                {"id": job_id},
+                {"$set": {
+                    "processed_addresses": batch_end,
+                    "geocoded_addresses": geocoded_count,
+                    "failed_addresses": failed_count,
+                    "progress_message": f"Completed batch {batch_end}/{total_addresses}"
+                }}
+            )
+            
+            # Small delay between batches to prevent overwhelming the API
+            if batch_end < total_addresses:
+                print(f"Batch {batch_start + 1}-{batch_end} completed. Brief pause before next batch...")
+                await asyncio.sleep(2.0)
+        
+        print(f"Geocoding completed: {geocoded_count} successful, {failed_count} failed out of {total_addresses} addresses")
         
         # Geographic optimization for door-to-door sales
         upload_jobs_collection.update_one(
