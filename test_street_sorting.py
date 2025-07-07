@@ -8,7 +8,7 @@ import json
 from datetime import datetime
 
 # Get backend URL from frontend/.env
-BACKEND_URL = "https://5eb9a30f-3d93-48d7-930d-ac4b62f3b928.preview.emergentagent.com/api"
+BACKEND_URL = "https://95a8d55d-d4d3-4544-aea7-981b1e115401.preview.emergentagent.com/api"
 
 def test_street_based_sorting():
     """Test street-based sorting with specific test cases"""

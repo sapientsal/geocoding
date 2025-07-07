@@ -9,7 +9,7 @@ import random
 from datetime import datetime
 
 # Get backend URL from frontend/.env
-BACKEND_URL = "https://5eb9a30f-3d93-48d7-930d-ac4b62f3b928.preview.emergentagent.com/api"
+BACKEND_URL = "https://95a8d55d-d4d3-4544-aea7-981b1e115401.preview.emergentagent.com/api"
 
 def create_test_csv_with_mixed_addresses(num_valid=15, num_invalid=5):
     """Create a test CSV file with a mix of valid and invalid addresses"""
