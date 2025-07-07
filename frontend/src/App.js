@@ -843,12 +843,23 @@ function App() {
                 </svg>
                 <span className="font-medium">
                   {uploadStatus === 'uploading' ? '📁 Datei wird hochgeladen' :
-                   jobStatus?.status === 'geocoding' ? '🗺️ Geocodierung läuft' :
+                   jobStatus?.status === 'geocoding' ? `🗺️ Geocodierung läuft (${jobStatus?.progress_percentage || 0}%, Erfolgsrate: ${jobStatus?.success_rate || 0}%)` :
                    jobStatus?.status === 'optimizing' ? '🚀 Route wird optimiert' :
                    jobStatus?.status === 'sorting' ? '📍 Straßen-Sortierung läuft' :
                    jobStatus?.status === 'parsing' ? '📊 Datei wird analysiert' :
+                   jobStatus?.status === 'resuming' ? '🔄 Job wird fortgesetzt' :
                    '⚡ Verarbeitung läuft'}
                 </span>
+                {jobStatus?.progress_message && (
+                  <div className="text-sm text-gray-500 mt-1">
+                    {jobStatus.progress_message}
+                  </div>
+                )}
+                {jobStatus?.failed_addresses > 0 && (
+                  <div className="text-sm text-orange-600 mt-1">
+                    ⚠️ {jobStatus.failed_addresses} Adressen konnten nicht geocodiert werden
+                  </div>
+                )}
               </div>
               <div className="flex items-center space-x-4">
                 <div className="text-sm font-medium">
