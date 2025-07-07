@@ -2549,9 +2549,40 @@ async def upload_file(
     
     return {"job_id": job_id, "message": "File uploaded successfully, processing started"}
 
+# Endpoint to resume interrupted jobs
+@app.post("/api/resume-job/{job_id}")
+async def resume_job(job_id: str, background_tasks: BackgroundTasks):
+    """Resume an interrupted geocoding job"""
+    try:
+        # Get the job
+        job = upload_jobs_collection.find_one({"id": job_id})
+        if not job:
+            raise HTTPException(status_code=404, detail="Job not found")
+        
+        # Check if job can be resumed
+        if job.get("status") not in ["geocoding", "error"]:
+            raise HTTPException(status_code=400, detail="Job cannot be resumed")
+        
+        # Reset status to allow resuming
+        upload_jobs_collection.update_one(
+            {"id": job_id},
+            {"$set": {
+                "status": "resuming",
+                "resumed_at": datetime.utcnow()
+            }}
+        )
+        
+        # Get the original file content from a temporary storage or re-upload
+        # For now, we'll require a re-upload for resume functionality
+        return {"message": "Job resume initiated. Please re-upload the file to continue processing."}
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error resuming job: {str(e)}")
+
+# Enhanced endpoint with better error handling
 @app.get("/api/job/{job_id}")
 async def get_job_status(job_id: str):
-    """Get job status and progress"""
+    """Get job status with enhanced progress information"""
     job = upload_jobs_collection.find_one({"id": job_id})
     
     if not job:
@@ -2562,14 +2593,25 @@ async def get_job_status(job_id: str):
         "id": job["id"],
         "filename": job["filename"],
         "status": job["status"],
-        "total_addresses": job["total_addresses"],
-        "processed_addresses": job["processed_addresses"],
-        "geocoded_addresses": job["geocoded_addresses"],
+        "total_addresses": job.get("total_addresses", 0),
+        "processed_addresses": job.get("processed_addresses", 0),
+        "geocoded_addresses": job.get("geocoded_addresses", 0),
+        "failed_addresses": job.get("failed_addresses", 0),
         "error_message": job.get("error_message"),
-        "created_at": job["created_at"].isoformat() if job["created_at"] else None,
+        "progress_message": job.get("progress_message"),
+        "created_at": job["created_at"].isoformat() if job.get("created_at") else None,
         "completed_at": job["completed_at"].isoformat() if job.get("completed_at") else None,
-        "sorting_type": job.get("sorting_type", "route_optimization")  # Add sorting_type
+        "optimization_type": job.get("optimization_type", "geographic_door_to_door"),
+        "can_resume": job.get("status") in ["geocoding", "error"] and job.get("processed_addresses", 0) > 0
     }
+    
+    # Calculate progress percentage
+    if job_data["total_addresses"] > 0:
+        job_data["progress_percentage"] = round((job_data["processed_addresses"] / job_data["total_addresses"]) * 100, 1)
+        job_data["success_rate"] = round((job_data["geocoded_addresses"] / max(job_data["processed_addresses"], 1)) * 100, 1)
+    else:
+        job_data["progress_percentage"] = 0
+        job_data["success_rate"] = 0
     
     return job_data
 
