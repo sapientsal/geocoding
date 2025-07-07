@@ -662,98 +662,140 @@ def calculate_distance_meters(lat1: float, lon1: float, lat2: float, lon2: float
     return R * c
 
 async def geocode_address_with_cache(address: str) -> dict:
-    """Geocode an address with caching and retry logic for performance"""
+    """
+    Geocode an address with enhanced caching, retry logic, and error handling for large datasets
+    """
     try:
         # Check cache first
         if address in address_cache:
-            cached_result = address_cache[address]
-            return {
-                'latitude': cached_result['lat'],
-                'longitude': cached_result['lon'],
-                'formatted_address': cached_result['formatted'],
-                'error': cached_result['error']
-            }
+            return address_cache[address]
         
-        # Reduced delay for better performance (0.3 seconds instead of 0.5)
-        await asyncio.sleep(0.3)
+        # Clean and prepare the address
+        address_clean = address.strip()
+        if not address_clean:
+            return {}
         
-        url = "https://nominatim.openstreetmap.org/search"
-        params = {
-            'q': address,
-            'format': 'json',
-            'limit': 1,
-            'addressdetails': 1,
-            'accept-language': 'de,en'  # Prefer German results
-        }
+        # Enhanced retry logic with exponential backoff
+        max_retries = 5
+        base_delay = 1.0
+        timeout = 30  # Increased timeout
         
-        headers = {
-            'User-Agent': 'SalesRouteOptimizer/1.0 (Enterprise)',
-            'Accept': 'application/json'
-        }
-        
-        # Retry logic for better reliability
-        max_retries = 2
-        error_msg = None
-        
-        for attempt in range(max_retries + 1):
+        for attempt in range(max_retries):
             try:
-                response = requests.get(url, params=params, headers=headers, timeout=15)
-                response.raise_for_status()
+                # Create session with timeout and retries
+                timeout_obj = aiohttp.ClientTimeout(total=timeout, connect=10)
+                connector = aiohttp.TCPConnector(limit=10, limit_per_host=5)
                 
-                data = response.json()
-                
-                if data:
-                    result = data[0]
-                    lat = float(result['lat'])
-                    lon = float(result['lon'])
-                    formatted_address = result.get('display_name', address)
+                async with aiohttp.ClientSession(
+                    timeout=timeout_obj,
+                    connector=connector,
+                    headers={'User-Agent': 'SalesRouteOptimizer/1.0'}
+                ) as session:
                     
-                    # Enhanced cache with metadata
-                    address_cache[address] = {
-                        'lat': lat,
-                        'lon': lon,
-                        'formatted': formatted_address,
-                        'error': None,
-                        'cached_at': datetime.now(),
-                        'source': 'nominatim'
-                    }
+                    # Enhanced URL encoding
+                    encoded_address = urllib.parse.quote_plus(address_clean)
+                    url = f"https://nominatim.openstreetmap.org/search?q={encoded_address}&format=json&limit=1&addressdetails=1&accept-language=de,en"
                     
-                    return {
-                        'latitude': lat,
-                        'longitude': lon,
-                        'formatted_address': formatted_address,
-                        'error': None
-                    }
-                else:
-                    error_msg = f"No geocoding results found for: {address}"
+                    print(f"Attempt {attempt + 1}/{max_retries}: Geocoding {address_clean}")
+                    
+                    async with session.get(url) as response:
+                        if response.status == 200:
+                            data = await response.json()
+                            
+                            if data and len(data) > 0:
+                                result = data[0]
+                                
+                                geocoded_result = {
+                                    'latitude': float(result.get('lat', 0)),
+                                    'longitude': float(result.get('lon', 0)),
+                                    'formatted_address': result.get('display_name', address),
+                                    'street': result.get('address', {}).get('road', ''),
+                                    'city': result.get('address', {}).get('city', ''),
+                                    'country': result.get('address', {}).get('country', ''),
+                                    'geocoded': True
+                                }
+                                
+                                # Cache successful results
+                                address_cache[address] = geocoded_result
+                                print(f"✅ Successfully geocoded: {address_clean}")
+                                return geocoded_result
+                            else:
+                                print(f"⚠️ No results found for: {address_clean}")
+                                # Cache empty results to avoid re-trying
+                                empty_result = {
+                                    'latitude': None,
+                                    'longitude': None,
+                                    'formatted_address': address,
+                                    'geocoded': False,
+                                    'error': 'No results found'
+                                }
+                                address_cache[address] = empty_result
+                                return empty_result
+                        
+                        elif response.status == 429:
+                            # Rate limited - use longer delay
+                            delay = base_delay * (3 ** attempt)
+                            print(f"⚠️ Rate limited, waiting {delay:.1f}s before retry...")
+                            await asyncio.sleep(delay)
+                            continue
+                        
+                        else:
+                            print(f"⚠️ HTTP {response.status} error for {address_clean}")
+                            if attempt == max_retries - 1:
+                                raise Exception(f"HTTP {response.status} error")
+                            
+                            # Wait before retry
+                            delay = base_delay * (2 ** attempt)
+                            await asyncio.sleep(delay)
+                            continue
+                            
+            except asyncio.TimeoutError:
+                print(f"⚠️ Timeout error for {address_clean} (attempt {attempt + 1})")
+                if attempt == max_retries - 1:
                     break
-                    
-            except requests.exceptions.Timeout:
-                if attempt < max_retries:
-                    await asyncio.sleep(1)  # Wait before retry
-                    continue
-                error_msg = f"Geocoding timeout after {max_retries + 1} attempts: {address}"
-                break
-            except requests.exceptions.RequestException as e:
-                if attempt < max_retries:
-                    await asyncio.sleep(1)
-                    continue
-                error_msg = f"Geocoding API error after {max_retries + 1} attempts: {str(e)}"
-                break
+                
+                delay = base_delay * (2 ** attempt)
+                await asyncio.sleep(delay)
+                continue
+                
+            except aiohttp.ClientError as e:
+                print(f"⚠️ Connection error for {address_clean}: {str(e)} (attempt {attempt + 1})")
+                if attempt == max_retries - 1:
+                    break
+                
+                delay = base_delay * (2 ** attempt)
+                await asyncio.sleep(delay)
+                continue
+                
+            except Exception as e:
+                print(f"⚠️ Unexpected error for {address_clean}: {str(e)} (attempt {attempt + 1})")
+                if attempt == max_retries - 1:
+                    break
+                
+                delay = base_delay * (2 ** attempt)
+                await asyncio.sleep(delay)
+                continue
         
-        # Cache negative results to avoid repeated failed requests
-        address_cache[address] = {
-            'lat': None,
-            'lon': None,
-            'formatted': None,
-            'error': error_msg,
-            'cached_at': datetime.now()
+        # If all retries failed, return empty result
+        print(f"❌ Failed to geocode after {max_retries} attempts: {address_clean}")
+        empty_result = {
+            'latitude': None,
+            'longitude': None,
+            'formatted_address': address,
+            'geocoded': False,
+            'error': f'Failed after {max_retries} attempts'
         }
+        address_cache[address] = empty_result
+        return empty_result
+        
+    except Exception as e:
+        print(f"❌ Critical error geocoding {address}: {str(e)}")
         return {
             'latitude': None,
             'longitude': None,
-            'formatted_address': None,
-            'error': error_msg
+            'formatted_address': address,
+            'geocoded': False,
+            'error': str(e)
         }
             
     except Exception as e:
