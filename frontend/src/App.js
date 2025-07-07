@@ -653,7 +653,36 @@ function App() {
     }
   };
 
-  const fetchOptimizedRoute = async (jobId) => {
+  const fetchJobLogs = async (jobId) => {
+    try {
+      const response = await fetch(`${BACKEND_URL}/api/job/${jobId}/logs?recent=100`);
+      const data = await response.json();
+      setJobLogs(data.logs || []);
+      setShowLogs(true);
+    } catch (error) {
+      console.error('Error fetching job logs:', error);
+      alert('Fehler beim Laden der Logs');
+    }
+  };
+
+  const getLogLevelColor = (level) => {
+    switch (level) {
+      case 'CRITICAL': return 'text-red-600 bg-red-50';
+      case 'ERROR': return 'text-red-500 bg-red-50';
+      case 'WARNING': return 'text-yellow-600 bg-yellow-50';
+      case 'INFO': return 'text-blue-600 bg-blue-50';
+      default: return 'text-gray-600 bg-gray-50';
+    }
+  };
+
+  const formatLogTime = (timestamp) => {
+    const date = new Date(timestamp);
+    return date.toLocaleTimeString('de-DE', { 
+      hour: '2-digit', 
+      minute: '2-digit', 
+      second: '2-digit' 
+    });
+  };
     try {
       const response = await fetch(`${BACKEND_URL}/api/optimized/${jobId}`);
       const data = await response.json();
