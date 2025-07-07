@@ -682,6 +682,8 @@ function App() {
       minute: '2-digit', 
       second: '2-digit' 
     });
+  };
+  
   const fetchOptimizedRoute = async (jobId) => {
     try {
       const response = await fetch(`${BACKEND_URL}/api/optimized/${jobId}`);
