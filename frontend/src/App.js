@@ -1664,9 +1664,9 @@ function App() {
                           )}
                         </div>
                         
-                        <div className="flex items-center space-x-2">
+                        <div className="flex flex-col items-end">
                           <span className={`px-2 py-1 rounded text-xs font-medium ${
-                            address.geocoded
+                            address.geocoded 
                               ? 'bg-green-100 text-green-700'
                               : 'bg-red-100 text-red-700'
                           }`}>
