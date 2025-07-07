@@ -15,6 +15,8 @@ import os
 import json
 import asyncio
 import re
+import aiohttp
+import urllib.parse
 from concurrent.futures import ThreadPoolExecutor
 import openpyxl
 from openpyxl.styles import PatternFill, Font
