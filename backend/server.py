@@ -1967,8 +1967,50 @@ async def process_street_sorted_job(job_id: str, file_content: bytes, filename: 
             }}
         )
 
-# New unified upload endpoint for geographic optimization
-@app.post("/api/upload-optimized")
+# New endpoint to get job logs for frontend display
+@app.get("/api/job/{job_id}/logs")
+async def get_job_logs(job_id: str, recent: int = 50):
+    """Get job logs for frontend display"""
+    try:
+        if job_id in job_logs:
+            logs = job_logs[job_id]
+            # Return recent logs
+            return {"logs": logs[-recent:] if logs else []}
+        else:
+            return {"logs": []}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching logs: {str(e)}")
+
+async def robust_geocode_with_monitoring(address: str, logger: JobLogger, address_index: int) -> dict:
+    """Ultra-robust geocoding with comprehensive monitoring and error handling"""
+    logger.log("INFO", f"Starting geocoding for address {address_index}", address_index, address)
+    
+    try:
+        # Check cache first
+        if address in address_cache:
+            logger.log("INFO", f"Address found in cache", address_index, address)
+            return address_cache[address]
+        
+        # Use the existing geocoding function but with monitoring
+        result = await geocode_address_with_cache(address)
+        
+        if result.get('geocoded'):
+            logger.log("INFO", f"Successfully geocoded", address_index, address)
+        else:
+            logger.log("WARNING", f"Failed to geocode: {result.get('error', 'Unknown error')}", address_index, address)
+        
+        return result
+        
+    except Exception as e:
+        error_msg = f"Critical geocoding error: {str(e)[:200]}"
+        logger.log("CRITICAL", error_msg, address_index, address)
+        return {
+            'latitude': None,
+            'longitude': None,
+            'formatted_address': address,
+            'geocoded': False,
+            'error': error_msg
+        }
 async def upload_file_optimized(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
     """Upload file for combined geographic optimization (door-to-door sales)"""
     if not file.filename.lower().endswith(('.xlsx', '.xls', '.csv')):
