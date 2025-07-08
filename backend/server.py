@@ -2657,6 +2657,11 @@ async def get_street_sorted_route(job_id: str):
         print(f"Error fetching street-sorted route: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error fetching street-sorted route: {str(e)}")
 
+@app.get("/api/street-sorted/{job_id}/export")
+async def export_street_sorted_route_endpoint(job_id: str):
+    """Export street-sorted addresses as Excel file with original columns + distance_to_next_m only"""
+    return await export_street_sorted_route(job_id)
+
 @app.post("/api/upload")
 async def upload_file(
     background_tasks: BackgroundTasks,
