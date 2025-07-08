@@ -1292,7 +1292,7 @@ function App() {
                             <Marker
                               key={address.id}
                               position={[address.latitude, address.longitude]}
-                              icon={createEnhancedNumberedIcon(index + 1, isStart, isEnd)}
+                              icon={createSimpleNumberedIcon(index + 1, isStart, isEnd)}
                             >
                               <Popup maxWidth={320} className="enhanced-popup">
                                 <div className="p-4">
