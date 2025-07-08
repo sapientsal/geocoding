@@ -1254,6 +1254,9 @@ function App() {
                         {/* Performance-optimierte Marker für große Datenmengen */}
                         {route.optimized_addresses
                           .filter((address, index) => {
+                            // Erst prüfen, ob Koordinaten vorhanden sind
+                            if (!address.latitude || !address.longitude) return false;
+                            
                             // Bei großen Datenmengen nur jeden n-ten Marker anzeigen
                             const totalAddresses = route.optimized_addresses.length;
                             if (totalAddresses > 1000) {
@@ -1267,7 +1270,7 @@ function App() {
                               return index === 0 || index === totalAddresses - 1 || index % 2 === 0;
                             }
                             // Unter 200 Adressen: alle anzeigen
-                            return address.latitude && address.longitude;
+                            return true;
                           })
                           .map((address, filteredIndex) => {
                             // Finde den ursprünglichen Index
