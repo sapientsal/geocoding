@@ -1251,47 +1251,64 @@ function App() {
                         
                         {/* Entfernt: Automatische Kartenanpassung für bessere Performance */}
                         
-                        {/* Erweiterte Marker für alle Adressen */}
-                        {route.optimized_addresses.map((address, index) => {
-                          if (!address.latitude || !address.longitude) return null;
-                          
-                          const isStart = index === 0;
-                          const isEnd = index === route.optimized_addresses.length - 1;
-                          
-                          return (
-                            <Marker
-                              key={address.id}
-                              position={[address.latitude, address.longitude]}
-                              icon={createSimpleNumberedIcon(index + 1, isStart, isEnd)}
-                            >
-                              <Popup maxWidth={300} className="simple-popup">
-                                <div className="p-2">
-                                  <div className="flex items-center mb-2">
-                                    <div className={`w-6 h-6 rounded-full flex items-center justify-center font-bold text-white text-xs mr-2 ${
-                                      isStart ? 'bg-green-500' : isEnd ? 'bg-red-500' : 'bg-blue-500'
-                                    }`}>
-                                      {index + 1}
+                        {/* Performance-optimierte Marker für große Datenmengen */}
+                        {route.optimized_addresses
+                          .filter((address, index) => {
+                            // Bei großen Datenmengen nur jeden n-ten Marker anzeigen
+                            const totalAddresses = route.optimized_addresses.length;
+                            if (totalAddresses > 1000) {
+                              // Zeige nur Start, Ende und jeden 10. Marker
+                              return index === 0 || index === totalAddresses - 1 || index % 10 === 0;
+                            } else if (totalAddresses > 500) {
+                              // Zeige nur Start, Ende und jeden 5. Marker
+                              return index === 0 || index === totalAddresses - 1 || index % 5 === 0;
+                            } else if (totalAddresses > 200) {
+                              // Zeige nur Start, Ende und jeden 2. Marker
+                              return index === 0 || index === totalAddresses - 1 || index % 2 === 0;
+                            }
+                            // Unter 200 Adressen: alle anzeigen
+                            return address.latitude && address.longitude;
+                          })
+                          .map((address, filteredIndex) => {
+                            // Finde den ursprünglichen Index
+                            const originalIndex = route.optimized_addresses.findIndex(addr => addr.id === address.id);
+                            const isStart = originalIndex === 0;
+                            const isEnd = originalIndex === route.optimized_addresses.length - 1;
+                            
+                            return (
+                              <Marker
+                                key={address.id}
+                                position={[address.latitude, address.longitude]}
+                                icon={createSimpleNumberedIcon(originalIndex + 1, isStart, isEnd)}
+                              >
+                                <Popup maxWidth={300} className="simple-popup">
+                                  <div className="p-2">
+                                    <div className="flex items-center mb-2">
+                                      <div className={`w-6 h-6 rounded-full flex items-center justify-center font-bold text-white text-xs mr-2 ${
+                                        isStart ? 'bg-green-500' : isEnd ? 'bg-red-500' : 'bg-blue-500'
+                                      }`}>
+                                        {originalIndex + 1}
+                                      </div>
+                                      <div className="font-bold text-sm">
+                                        {isStart ? 'Start' : isEnd ? 'Ziel' : `Stopp ${originalIndex + 1}`}
+                                      </div>
                                     </div>
-                                    <div className="font-bold text-sm">
-                                      {isStart ? 'Start' : isEnd ? 'Ziel' : `Stopp ${index + 1}`}
-                                    </div>
-                                  </div>
-                                  
-                                  <div className="text-sm">
-                                    <div className="font-medium mb-1">{address.original_address}</div>
-                                    {address.formatted_address && (
-                                      <div className="text-gray-600 text-xs mb-2">{address.formatted_address}</div>
-                                    )}
                                     
-                                    <div className="text-xs text-gray-500">
-                                      Lat: {address.latitude.toFixed(4)}, Lng: {address.longitude.toFixed(4)}
+                                    <div className="text-sm">
+                                      <div className="font-medium mb-1">{address.original_address}</div>
+                                      {address.formatted_address && (
+                                        <div className="text-gray-600 text-xs mb-2">{address.formatted_address}</div>
+                                      )}
+                                      
+                                      <div className="text-xs text-gray-500">
+                                        Lat: {address.latitude.toFixed(4)}, Lng: {address.longitude.toFixed(4)}
+                                      </div>
                                     </div>
                                   </div>
-                                </div>
-                              </Popup>
-                            </Marker>
-                          );
-                        })}
+                                </Popup>
+                              </Marker>
+                            );
+                          })}
                         
                         {/* Vereinfachte Route-Linie ohne Animationen */}
                         {route.optimized_addresses.length > 1 && (
