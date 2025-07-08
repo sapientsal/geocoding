@@ -208,6 +208,30 @@ def run_test():
             print(f"⚠️ {task}: {status}")
     
     print("=" * 80)
+    
+    # Print detailed test report
+    print("\n📝 Detailed Test Report:")
+    print("=" * 80)
+    
+    print("Excel Export Functionality Test Results:")
+    print("1. The exported Excel file should contain ONLY the original columns from the uploaded file plus the mandatory 'distance_to_next_m' column")
+    print("2. No extra columns like coordinates, geocoding status, technical info, etc. should be included in the export")
+    print("3. The 'distance_to_next_m' column should be present and contain correct distance values in meters")
+    
+    print("\nFindings:")
+    for detail in test_results["Excel Export"]["details"]:
+        print(f"  {detail['status']} - {detail['message']}")
+    
+    print("\nConclusion:")
+    if test_results["Excel Export"]["status"] == "Passed":
+        print("✅ The Excel export functionality meets all requirements.")
+    else:
+        print("❌ The Excel export functionality does not meet all requirements.")
+        print("   The export contains system-generated columns that should be excluded.")
+        print("   These columns include: latitude, longitude, formatted_address, street_clean, house_number_numeric, house_number_letter")
+        print("   According to the requirements, only the original columns plus 'distance_to_next_m' should be included.")
+    
+    print("=" * 80)
 
 if __name__ == "__main__":
     run_test()
