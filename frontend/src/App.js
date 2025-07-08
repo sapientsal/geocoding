@@ -1207,7 +1207,7 @@ function App() {
                 <div className="flex items-center space-x-2">
                   <button
                     onClick={handleFullscreen}
-                    className="text-white hover:text-gray-200 p-2 rounded-lg hover:bg-white hover:bg-opacity-10 transition-all duration-300"
+                    className="text-white p-2 rounded-lg"
                     title={isFullscreen ? 'Fenstermodus' : 'Vollbild'}
                   >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1223,7 +1223,7 @@ function App() {
                       setShowMap(false);
                       setIsFullscreen(false);
                     }}
-                    className="text-white hover:text-gray-200 text-2xl p-2 rounded-lg hover:bg-white hover:bg-opacity-10 transition-all duration-300"
+                    className="text-white text-2xl p-2 rounded-lg"
                   >
                     ×
                   </button>
