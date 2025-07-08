@@ -174,6 +174,68 @@ def test_excel_export(job_id):
         log_test("Excel Export", f"Excel export testing failed with error: {str(e)}", False)
         return False
 
+def test_street_sorted_export(job_id):
+    """Test street-sorted export functionality to ensure it contains only original columns + distance_to_next_m"""
+    print("\n🔍 Testing Street-Sorted Export Functionality...")
+    
+    if not job_id:
+        log_test("Excel Export", "Cannot test street-sorted export without a valid job ID", False)
+        return None
+    
+    try:
+        # Get the street-sorted export
+        print(f"Testing /api/street-sorted/{job_id}/export endpoint...")
+        response = requests.get(f"{BACKEND_URL}/street-sorted/{job_id}/export")
+        
+        if response.status_code != 200:
+            log_test("Excel Export", f"Failed to export street-sorted Excel file. Status code: {response.status_code}", False)
+            print(f"Response: {response.text}")
+            return False
+        
+        # Check content type and disposition headers
+        content_type = response.headers.get('Content-Type')
+        content_disposition = response.headers.get('Content-Disposition')
+        
+        if content_type != 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' or 'attachment' not in content_disposition:
+            log_test("Excel Export", f"Street-sorted Excel export has incorrect headers. Content-Type: {content_type}, Content-Disposition: {content_disposition}", False)
+            return False
+        
+        # Save the Excel file temporarily
+        with open('/tmp/street_export_test.xlsx', 'wb') as f:
+            f.write(response.content)
+        
+        # Read the Excel file with pandas
+        df = pd.read_excel('/tmp/street_export_test.xlsx', sheet_name='Straßen-sortierte Adressen')
+        
+        print(f"Street-sorted Excel file columns: {list(df.columns)}")
+        
+        # Check if distance_to_next_m column is present
+        if 'distance_to_next_m' not in df.columns and 'Entfernung_zur_naechsten_Adresse_m' not in df.columns:
+            log_test("Excel Export", "distance_to_next_m column is missing from the street-sorted export", False)
+            return False
+        else:
+            log_test("Excel Export", "Distance column is present in the street-sorted export")
+        
+        # Check if any system-generated columns are present
+        system_columns = ['latitude', 'longitude', 'geocoded', 'geocoding_error', 'formatted_address', 
+                          'geocoded_address', 'Breitengrad', 'Laengengrad', 'Geocodierte_Adresse',
+                          'street_clean', 'house_number_numeric', 'house_number_letter']
+        
+        found_system_columns = [col for col in df.columns if col in system_columns]
+        if found_system_columns:
+            log_test("Excel Export", f"Street-sorted export contains system-generated columns that should be excluded: {found_system_columns}", False)
+            return False
+        else:
+            log_test("Excel Export", "No system-generated columns found in the street-sorted export")
+        
+        # Success - all checks passed
+        log_test("Excel Export", "Street-sorted Excel export contains only original columns plus distance column as required")
+        return True
+        
+    except Exception as e:
+        log_test("Excel Export", f"Street-sorted Excel export testing failed with error: {str(e)}", False)
+        return False
+
 def run_test():
     """Run the Excel export test"""
     print("\n🚀 Starting Excel Export Test")
@@ -189,6 +251,13 @@ def run_test():
             test_job = completed_jobs[1] if len(completed_jobs) > 1 else completed_jobs[0]
             print(f"Using existing job {test_job['id']} for export testing")
             test_excel_export(test_job['id'])
+            
+            # Also test street-sorted export if available
+            try:
+                print("\nTesting street-sorted export for the same job...")
+                test_street_sorted_export(test_job['id'])
+            except Exception as e:
+                print(f"Error testing street-sorted export: {str(e)}")
         else:
             print("No completed jobs found for export testing")
     else:
