@@ -2766,10 +2766,8 @@ async def export_route_excel(job_id: str):
         success_fill = PatternFill(start_color="C6EFCE", end_color="C6EFCE", fill_type="solid")
         error_fill = PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid")
         
-        # Headers: New order column + ALL original columns + geocoding info
-        route_headers = ["Neue_Reihenfolge"] + original_columns + [
-            "Formatierte_Adresse", "Breitengrad", "Längengrad", "Geocodiert", "Geocoding_Fehler"
-        ]
+        # Headers: ONLY original columns + distance_to_next_m  
+        route_headers = original_columns + ["distance_to_next_m"]
         
         # Write headers
         for col, header in enumerate(route_headers, 1):
