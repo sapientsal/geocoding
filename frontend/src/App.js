@@ -1298,17 +1298,15 @@ function App() {
                           );
                         })}
                         
-                        {/* Erweiterte Route-Linie mit Animationen */}
+                        {/* Vereinfachte Route-Linie ohne Animationen */}
                         {route.optimized_addresses.length > 1 && (
                           <Polyline
                             positions={route.optimized_addresses
                               .filter(addr => addr.latitude && addr.longitude)
                               .map(addr => [addr.latitude, addr.longitude])}
                             color="#3b82f6"
-                            weight={5}
-                            opacity={0.9}
-                            dashArray="10, 5"
-                            className="animated-route"
+                            weight={3}
+                            opacity={0.7}
                           />
                         )}
                       </MapContainer>
