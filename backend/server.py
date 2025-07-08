@@ -2622,9 +2622,10 @@ async def export_street_sorted_route(job_id: str):
         print(f"Error exporting street-sorted route: {e}")
         raise HTTPException(status_code=500, detail=f"Fehler beim Excel-Export: {str(e)}")
 
-@app.get("/api/street-sorted/{job_id}")
-async def get_street_sorted_route(job_id: str):
-    """Get street-sorted route data"""
+@app.get("/api/street-sorted/{job_id}/export")
+async def export_street_sorted_route_endpoint(job_id: str):
+    """Export street-sorted addresses as Excel file with original columns + distance_to_next_m only"""
+    return await export_street_sorted_route(job_id)
     try:
         route_data = routes_collection.find_one({"job_id": job_id, "sorting_type": "street_based"})
         if not route_data:
