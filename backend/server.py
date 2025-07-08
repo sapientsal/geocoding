@@ -2483,7 +2483,7 @@ async def export_optimized_route(job_id: str):
         print(f"Error exporting optimized route: {e}")
         raise HTTPException(status_code=500, detail=f"Fehler beim Excel-Export: {str(e)}")
 async def export_street_sorted_route(job_id: str):
-    """Export street-sorted addresses as Excel file"""
+    """Export street-sorted addresses as Excel file with original columns + distance_to_next_m only"""
     try:
         # Get route data from database
         route_data = routes_collection.find_one({"job_id": job_id, "sorting_type": "street_based"})
@@ -2495,13 +2495,18 @@ async def export_street_sorted_route(job_id: str):
         if not job:
             raise HTTPException(status_code=404, detail="Job not found")
         
-        # Prepare data for Excel export
+        # Prepare data for Excel export with ONLY original columns + distance_to_next_m
         addresses = route_data['sorted_addresses']
         
-        # Create DataFrame from sorted addresses preserving all original columns
+        # Create DataFrame from sorted addresses preserving ONLY original columns + distance_to_next_m
         rows = []
         for addr in addresses:
             row_data = addr.get('row_data', {})
+            # Add distance_to_next_m if it exists
+            if 'distance_to_next' in addr and addr['distance_to_next'] is not None:
+                row_data['distance_to_next_m'] = addr['distance_to_next']
+            else:
+                row_data['distance_to_next_m'] = None
             rows.append(row_data)
         
         df = pd.DataFrame(rows)
@@ -2543,8 +2548,9 @@ async def export_street_sorted_route(job_id: str):
                 'Verarbeitungsdatum': [job['created_at'].strftime('%d.%m.%Y %H:%M:%S')],
                 'Gesamte Adressen': [len(addresses)],
                 'Erfolgreich geocodiert': [sum(1 for addr in addresses if addr.get('geocoded', False))],
-                'Sortierung': ['Nach Straße und Hausnummer'],
-                'Gesamtstrecke (m)': [route_data.get('total_distance', 0)]
+                'Sortierung': ['Straßen-basiert'],
+                'Gesamtstrecke (m)': [route_data.get('total_distance', 0)],
+                'Gesamtstrecke (km)': [round(route_data.get('total_distance', 0) / 1000, 2)]
             }
             
             summary_df = pd.DataFrame(summary_data)
