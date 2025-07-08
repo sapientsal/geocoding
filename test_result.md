@@ -246,6 +246,21 @@ backend:
         agent: "testing"
         comment: "Conducted comprehensive testing of the German address format cleaning logic and house number sorting. Created multiple test cases to verify the street name extraction from formats like '624 Worpswede Albert-Schwedt-Weg' correctly extracts 'Albert-Schwedt-Weg'. Also verified that house numbers within each street are properly sorted numerically with letter suffixes (e.g., [1A, 3A, 3C, 4, 7, 8, 10]). The clean_street_name function correctly handles German address formats by removing project codes and city prefixes. The extract_house_number_parts function properly extracts numeric and alphabetic parts from house numbers for correct sorting. All tests passed, confirming that the street-based sorting functionality is now working correctly."
 
+  - task: "Excel Export Functionality"
+    implemented: true
+    working: false
+    file: "server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Implemented Excel export functionality for optimized routes with original columns + distance_to_next_m"
+      - working: false
+        agent: "testing"
+        comment: "The Excel export functionality does not meet all requirements. While it correctly includes the distance_to_next_m column with proper values, it also includes system-generated columns that should be excluded. The exported Excel file contains system-generated columns like latitude, longitude, formatted_address, street_clean, house_number_numeric, and house_number_letter. According to the requirements, only the original columns plus distance_to_next_m should be included in the export."
+
 frontend:
   - task: "File Upload Interface"
     implemented: true
