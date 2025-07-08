@@ -15,58 +15,32 @@ L.Icon.Default.mergeOptions({
 });
 
 // Erweiterte Custom Icons für nummerierte Marker
-const createEnhancedNumberedIcon = (number, isStart = false, isEnd = false) => {
+// Vereinfachte Custom Icons für nummerierte Marker (Performance-optimiert)
+const createSimpleNumberedIcon = (number, isStart = false, isEnd = false) => {
   const baseColor = isStart ? '#22c55e' : isEnd ? '#ef4444' : '#3b82f6';
-  const shadowColor = isStart ? '#16a34a' : isEnd ? '#dc2626' : '#2563eb';
-  const textColor = '#ffffff';
-  const size = isStart || isEnd ? 40 : 35;
+  const size = 30; // Einheitliche Größe für alle Marker
   
   return L.divIcon({
     html: `
       <div style="
-        position: relative;
-        width: ${size}px;
-        height: ${size}px;
-      ">
-        <div style="
-          background: linear-gradient(145deg, ${baseColor} 0%, ${shadowColor} 100%);
-          color: ${textColor}; 
-          width: ${size}px; 
-          height: ${size}px; 
-          border-radius: 50%; 
-          display: flex; 
-          align-items: center; 
-          justify-content: center; 
-          font-weight: bold; 
-          font-size: ${isStart || isEnd ? '14px' : '12px'};
-          border: 3px solid white;
-          box-shadow: 0 4px 12px rgba(0,0,0,0.4), 0 2px 6px rgba(0,0,0,0.2);
-          position: relative;
-          z-index: 2;
-          transform: ${isStart || isEnd ? 'scale(1.1)' : 'scale(1)'};
-          transition: all 0.3s ease;
-        ">${number}</div>
-        <div style="
-          position: absolute;
-          top: 50%;
-          left: 50%;
-          transform: translate(-50%, -50%);
-          width: ${size + 10}px;
-          height: ${size + 10}px;
-          background: ${baseColor};
-          border-radius: 50%;
-          opacity: 0.2;
-          z-index: 1;
-          animation: pulse 2s infinite;
-        "></div>
-      </div>
+        background: ${baseColor};
+        color: white; 
+        width: ${size}px; 
+        height: ${size}px; 
+        border-radius: 50%; 
+        display: flex; 
+        align-items: center; 
+        justify-content: center; 
+        font-weight: bold; 
+        font-size: 12px;
+        border: 2px solid white;
+      ">${number}</div>
     `,
-    className: 'custom-enhanced-icon',
+    className: 'simple-marker',
     iconSize: [size, size],
     iconAnchor: [size / 2, size / 2],
     popupAnchor: [0, -size / 2]
   });
-};
 
 // Komponente für automatische Kartenanpassung
 const MapFitBounds = ({ addresses }) => {
