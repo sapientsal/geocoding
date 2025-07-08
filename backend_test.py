@@ -5,6 +5,7 @@ import csv
 import os
 import io
 import json
+import pandas as pd
 from datetime import datetime
 
 # Get backend URL from frontend/.env
