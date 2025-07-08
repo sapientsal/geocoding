@@ -1301,7 +1301,11 @@ function App() {
                                       )}
                                       
                                       <div className="text-xs text-gray-500">
-                                        Lat: {address.latitude.toFixed(4)}, Lng: {address.longitude.toFixed(4)}
+                                        {address.latitude && address.longitude ? (
+                                          <>Lat: {address.latitude.toFixed(4)}, Lng: {address.longitude.toFixed(4)}</>
+                                        ) : (
+                                          'Koordinaten nicht verfügbar'
+                                        )}
                                       </div>
                                     </div>
                                   </div>
