@@ -2391,16 +2391,32 @@ async def export_optimized_route(job_id: str):
         # Prepare data for Excel export with ONLY original columns + distance_to_next_m
         addresses = route_data['optimized_addresses']
         
+        # Define system-generated columns to exclude
+        system_columns = {
+            'latitude', 'longitude', 'geocoded', 'geocoding_error', 'formatted_address',
+            'geocoded_address', 'Breitengrad', 'Laengengrad', 'Geocodierte_Adresse',
+            'street_clean', 'house_number_numeric', 'house_number_letter', 'Formatierte_Adresse',
+            'Longitude', 'Latitude', 'Geocodiert', 'Geocoding_Fehler'
+        }
+        
         # Create DataFrame from optimized addresses preserving ONLY original columns + distance_to_next_m
         rows = []
         for addr in addresses:
             row_data = addr.get('row_data', {})
+            
+            # Filter out system-generated columns
+            filtered_row = {}
+            for key, value in row_data.items():
+                if key not in system_columns:
+                    filtered_row[key] = value
+            
             # Add distance_to_next_m if it exists
             if 'distance_to_next' in addr and addr['distance_to_next'] is not None:
-                row_data['distance_to_next_m'] = addr['distance_to_next']
+                filtered_row['distance_to_next_m'] = addr['distance_to_next']
             else:
-                row_data['distance_to_next_m'] = None
-            rows.append(row_data)
+                filtered_row['distance_to_next_m'] = None
+                
+            rows.append(filtered_row)
         
         df = pd.DataFrame(rows)
         
