@@ -1269,75 +1269,27 @@ function App() {
                               position={[address.latitude, address.longitude]}
                               icon={createSimpleNumberedIcon(index + 1, isStart, isEnd)}
                             >
-                              <Popup maxWidth={320} className="enhanced-popup">
-                                <div className="p-4">
-                                  <div className="flex items-center mb-3">
-                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-white text-sm mr-3 shadow-lg ${
-                                      isStart ? 'bg-gradient-to-r from-green-500 to-green-600' : 
-                                      isEnd ? 'bg-gradient-to-r from-red-500 to-red-600' : 
-                                      'bg-gradient-to-r from-blue-500 to-blue-600'
+                              <Popup maxWidth={300} className="simple-popup">
+                                <div className="p-2">
+                                  <div className="flex items-center mb-2">
+                                    <div className={`w-6 h-6 rounded-full flex items-center justify-center font-bold text-white text-xs mr-2 ${
+                                      isStart ? 'bg-green-500' : isEnd ? 'bg-red-500' : 'bg-blue-500'
                                     }`}>
                                       {index + 1}
                                     </div>
-                                    <div className="font-bold text-lg">
-                                      {isStart ? '🟢 Start' : isEnd ? '🔴 Ziel' : `📍 Stopp ${index + 1}`}
+                                    <div className="font-bold text-sm">
+                                      {isStart ? 'Start' : isEnd ? 'Ziel' : `Stopp ${index + 1}`}
                                     </div>
                                   </div>
                                   
-                                  <div className="space-y-3 text-sm">
-                                    <div className="bg-gray-50 rounded-lg p-3">
-                                      <div className="font-semibold text-gray-800 mb-1">
-                                        {address.original_address}
-                                      </div>
-                                      {address.formatted_address && (
-                                        <div className="text-gray-600 text-xs">
-                                          📍 {address.formatted_address}
-                                        </div>
-                                      )}
-                                    </div>
-                                    
-                                    <div className="grid grid-cols-2 gap-2 text-xs">
-                                      <div className="bg-blue-50 rounded p-2">
-                                        <div className="text-blue-700 font-medium">Breitengrad</div>
-                                        <div className="text-blue-900">{address.latitude.toFixed(6)}</div>
-                                      </div>
-                                      <div className="bg-blue-50 rounded p-2">
-                                        <div className="text-blue-700 font-medium">Längengrad</div>
-                                        <div className="text-blue-900">{address.longitude.toFixed(6)}</div>
-                                      </div>
-                                    </div>
-                                    
-                                    {/* Distanz-Informationen */}
-                                    {routeDistances.length > 0 && (
-                                      <div className="border-t pt-3">
-                                        {routeDistances.find(d => d.from === index) && (
-                                          <div className="flex items-center text-xs text-green-600 bg-green-50 rounded p-2 mb-1">
-                                            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                                            </svg>
-                                            Zum nächsten Stopp: <span className="font-bold ml-1">{routeDistances.find(d => d.from === index).distance.toFixed(2)} km</span>
-                                          </div>
-                                        )}
-                                        {routeDistances.find(d => d.to === index) && index > 0 && (
-                                          <div className="flex items-center text-xs text-gray-500 bg-gray-50 rounded p-2">
-                                            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 17l-5-5m0 0l5-5m-5 5h12" />
-                                            </svg>
-                                            Vom vorherigen Stopp: <span className="font-medium ml-1">{routeDistances.find(d => d.to === index).distance.toFixed(2)} km</span>
-                                          </div>
-                                        )}
-                                      </div>
+                                  <div className="text-sm">
+                                    <div className="font-medium mb-1">{address.original_address}</div>
+                                    {address.formatted_address && (
+                                      <div className="text-gray-600 text-xs mb-2">{address.formatted_address}</div>
                                     )}
                                     
-                                    {/* Status Badge */}
-                                    <div className="flex justify-end">
-                                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                        address.geocoded
-                                          ? 'bg-green-100 text-green-700'
-                                          : 'bg-red-100 text-red-700'
-                                      }`}>
-                                        {address.geocoded ? '✅ Erfolgreich geocodiert' : '⚠️ Geocodierung fehlgeschlagen'}
-                                      </span>
+                                    <div className="text-xs text-gray-500">
+                                      Lat: {address.latitude.toFixed(4)}, Lng: {address.longitude.toFixed(4)}
                                     </div>
                                   </div>
                                 </div>
