@@ -2376,7 +2376,7 @@ async def get_optimized_route(job_id: str):
 
 @app.get("/api/optimized/{job_id}/export")
 async def export_optimized_route(job_id: str):
-    """Export optimized route as Excel file"""
+    """Export optimized route as Excel file with original columns + distance_to_next_m only"""
     try:
         # Get route data from database
         route_data = routes_collection.find_one({"job_id": job_id, "optimization_type": "geographic_door_to_door"})
@@ -2388,13 +2388,18 @@ async def export_optimized_route(job_id: str):
         if not job:
             raise HTTPException(status_code=404, detail="Job not found")
         
-        # Prepare data for Excel export
+        # Prepare data for Excel export with ONLY original columns + distance_to_next_m
         addresses = route_data['optimized_addresses']
         
-        # Create DataFrame from optimized addresses preserving all original columns
+        # Create DataFrame from optimized addresses preserving ONLY original columns + distance_to_next_m
         rows = []
         for addr in addresses:
             row_data = addr.get('row_data', {})
+            # Add distance_to_next_m if it exists
+            if 'distance_to_next' in addr and addr['distance_to_next'] is not None:
+                row_data['distance_to_next_m'] = addr['distance_to_next']
+            else:
+                row_data['distance_to_next_m'] = None
             rows.append(row_data)
         
         df = pd.DataFrame(rows)
