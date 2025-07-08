@@ -1312,30 +1312,25 @@ function App() {
                       </MapContainer>
                     )}
                     
-                    {/* Floating Map Controls */}
+                    {/* Vereinfachte Map Controls */}
                     <div className="absolute top-4 right-4 z-1000">
-                      <div className="bg-white bg-opacity-95 backdrop-blur-sm rounded-xl shadow-lg p-3 space-y-3">
-                        <div className="flex flex-col space-y-2">
-                          <button
-                            onClick={handleResetView}
-                            className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-medium transition-all duration-300 shadow-md hover:shadow-lg"
-                            title="Ansicht zurücksetzen"
-                          >
-                            <svg className="w-4 h-4 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                            </svg>
-                          </button>
-                          <select
-                            value={currentMapLayer}
-                            onChange={(e) => handleLayerChange(e.target.value)}
-                            className="px-2 py-1 border border-gray-300 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
-                            title="Kartenansicht wählen"
-                          >
-                            <option value="standard">🗺️ Standard</option>
-                            <option value="satellite">🛰️ Satellit</option>
-                            <option value="terrain">🏔️ Terrain</option>
-                          </select>
-                        </div>
+                      <div className="bg-white rounded p-2 space-y-2">
+                        <button
+                          onClick={handleResetView}
+                          className="px-2 py-1 bg-blue-600 text-white rounded text-xs"
+                          title="Ansicht zurücksetzen"
+                        >
+                          Reset
+                        </button>
+                        <select
+                          value={currentMapLayer}
+                          onChange={(e) => handleLayerChange(e.target.value)}
+                          className="px-1 py-1 border rounded text-xs bg-white"
+                        >
+                          <option value="standard">Standard</option>
+                          <option value="satellite">Satellit</option>
+                          <option value="terrain">Terrain</option>
+                        </select>
                       </div>
                     </div>
                   </div>
