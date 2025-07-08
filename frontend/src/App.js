@@ -1376,46 +1376,35 @@ function App() {
                         </svg>
                         Route-Reihenfolge
                       </h3>
-                      <div className="space-y-2 max-h-80 overflow-y-auto custom-scrollbar">
+                      <div className="space-y-1 max-h-80 overflow-y-auto">
                         {route.optimized_addresses.map((address, index) => {
                           const isStart = index === 0;
                           const isEnd = index === route.optimized_addresses.length - 1;
-                          const routeDistance = routeDistances.find(d => d.from === index);
                           
                           return (
                             <div
                               key={address.id}
-                              className={`p-3 rounded-lg border-l-4 text-sm transition-all hover:shadow-md cursor-pointer ${
-                                isStart ? 'bg-gradient-to-r from-green-50 to-green-100 border-green-500 hover:from-green-100 hover:to-green-200' :
-                                isEnd ? 'bg-gradient-to-r from-red-50 to-red-100 border-red-500 hover:from-red-100 hover:to-red-200' :
-                                'bg-gradient-to-r from-blue-50 to-blue-100 border-blue-500 hover:from-blue-100 hover:to-blue-200'
+                              className={`p-2 rounded border-l-2 text-sm ${
+                                isStart ? 'bg-green-50 border-green-500' :
+                                isEnd ? 'bg-red-50 border-red-500' :
+                                'bg-blue-50 border-blue-500'
                               }`}
                             >
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center">
-                                  <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white mr-3 shadow-md ${
-                                    isStart ? 'bg-gradient-to-r from-green-500 to-green-600' :
-                                    isEnd ? 'bg-gradient-to-r from-red-500 to-red-600' :
-                                    'bg-gradient-to-r from-blue-500 to-blue-600'
-                                  }`}>
-                                    {index + 1}
-                                  </span>
-                                  <div className="min-w-0 flex-1">
-                                    <div className="font-medium text-gray-800 truncate mb-1">
-                                      {address.original_address}
-                                    </div>
-                                    {routeDistance && (
-                                      <div className="text-xs text-gray-600 flex items-center">
-                                        <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                                        </svg>
-                                        {routeDistance.distance.toFixed(2)} km
-                                      </div>
-                                    )}
+                              <div className="flex items-center">
+                                <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white mr-2 ${
+                                  isStart ? 'bg-green-500' :
+                                  isEnd ? 'bg-red-500' :
+                                  'bg-blue-500'
+                                }`}>
+                                  {index + 1}
+                                </span>
+                                <div className="min-w-0 flex-1">
+                                  <div className="font-medium text-gray-800 truncate">
+                                    {address.original_address}
                                   </div>
                                 </div>
                                 {!address.geocoded && (
-                                  <div className="text-xs text-red-600 font-bold">
+                                  <div className="text-xs text-red-600">
                                     ⚠️
                                   </div>
                                 )}
