@@ -2311,6 +2311,7 @@ async def process_geographic_optimization_job(job_id: str, file_content: bytes, 
                 "error_message": str(e)
             }}
         )
+@app.post("/api/upload-street-sorted")
 async def upload_file_street_sorted(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
     """Upload file for street-based address sorting"""
     if not file.filename.lower().endswith(('.xlsx', '.xls', '.csv')):
