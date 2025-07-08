@@ -1278,8 +1278,7 @@ function App() {
                           attribution={getTileLayerAttribution(currentMapLayer)}
                         />
                         
-                        {/* Automatische Kartenanpassung */}
-                        <MapFitBounds addresses={route.optimized_addresses} />
+                        {/* Entfernt: Automatische Kartenanpassung für bessere Performance */}
                         
                         {/* Erweiterte Marker für alle Adressen */}
                         {route.optimized_addresses.map((address, index) => {
