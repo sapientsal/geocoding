@@ -2775,33 +2775,22 @@ async def export_route_excel(job_id: str):
             cell.fill = header_fill
             cell.font = header_font
         
-        # Write optimized data with ALL original columns
+        # Write optimized data with ONLY original columns + distance_to_next_m
         for order_index, addr_index in enumerate(route["optimized_order"]):
             if addr_index < len(addresses):
                 addr = addresses[addr_index]
                 row_idx = order_index + 2
                 
-                # New order number
-                ws_route.cell(row=row_idx, column=1, value=order_index + 1)
-                
-                # ALL original Excel columns
+                # Original Excel columns
                 if addr.get("original_row_data"):
-                    for col_idx, col_name in enumerate(original_columns, 2):
+                    for col_idx, col_name in enumerate(original_columns, 1):
                         original_value = addr["original_row_data"].get(col_name, "")
                         ws_route.cell(row=row_idx, column=col_idx, value=original_value)
                 
-                # Geocoding information
-                geo_start_col = len(original_columns) + 2
-                ws_route.cell(row=row_idx, column=geo_start_col, value=addr.get("formatted_address", ""))
-                ws_route.cell(row=row_idx, column=geo_start_col + 1, value=addr.get("latitude", ""))
-                ws_route.cell(row=row_idx, column=geo_start_col + 2, value=addr.get("longitude", ""))
-                ws_route.cell(row=row_idx, column=geo_start_col + 3, value="Ja" if addr.get("geocoded") else "Nein")
-                ws_route.cell(row=row_idx, column=geo_start_col + 4, value=addr.get("geocoding_error", ""))
-                
-                # Apply styling based on geocoding status
-                fill_color = success_fill if addr.get("geocoded") else error_fill
-                for col in range(1, len(route_headers) + 1):
-                    ws_route.cell(row=row_idx, column=col).fill = fill_color
+                # Add distance_to_next_m column at the end
+                distance_col = len(original_columns) + 1
+                distance_value = addr.get("distance_to_next", None)
+                ws_route.cell(row=row_idx, column=distance_col, value=distance_value)
         
         # Auto-adjust column widths
         for column in ws_route.columns:
