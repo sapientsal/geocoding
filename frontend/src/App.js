@@ -41,10 +41,7 @@ const createSimpleNumberedIcon = (number, isStart = false, isEnd = false) => {
     iconAnchor: [size / 2, size / 2],
     popupAnchor: [0, -size / 2]
   });
-
-// Komponente für automatische Kartenanpassung
-const MapFitBounds = ({ addresses }) => {
-  const map = useMap();
+};
   
   useEffect(() => {
     if (addresses && addresses.length > 0) {
