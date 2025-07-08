@@ -18,7 +18,9 @@ def test_api_performance():
     end_time = time.time()
     
     if response.status_code == 200:
-        jobs = response.json().get("jobs", [])
+        jobs = response.json()
+        if isinstance(jobs, dict) and "jobs" in jobs:
+            jobs = jobs.get("jobs", [])
         print(f"✅ Retrieved {len(jobs)} jobs in {end_time - start_time:.2f} seconds")
         
         if jobs:
