@@ -42,45 +42,21 @@
   font-size: 0.875rem;
 }
 
-/* Card hover effects */
+/* Card styles - static */
 .job-card {
-  transition: all 0.3s ease;
+  /* Removed transition for performance */
 }
 
-.job-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
-}
-
-/* Modal animations */
+/* Modal styles - no animations */
 .modal-backdrop {
-  backdrop-filter: blur(4px);
-  animation: fadeIn 0.3s ease-out;
+  /* Removed backdrop-filter and animation for performance */
 }
 
 .modal-content {
-  animation: slideIn 0.3s ease-out;
+  /* Removed animation for performance */
 }
 
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-@keyframes slideIn {
-  from {
-    transform: translateY(-20px);
-    opacity: 0;
-  }
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
-}
+/* Removed all keyframe animations for performance */
 
 /* Route list styling */
 .route-stop {
