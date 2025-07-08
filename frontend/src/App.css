@@ -58,14 +58,9 @@
 
 /* Removed all keyframe animations for performance */
 
-/* Route list styling */
+/* Route list styling - static */
 .route-stop {
-  transition: all 0.2s ease;
-}
-
-.route-stop:hover {
-  background-color: #f8fafc;
-  transform: translateX(4px);
+  /* Removed transition for performance */
 }
 
 /* File input styling */
