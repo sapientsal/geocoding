@@ -209,14 +209,9 @@ function App() {
   };
 
   const handleResetView = () => {
-    if (mapRef.current && route?.optimized_addresses) {
-      const validAddresses = route.optimized_addresses.filter(addr => addr.latitude && addr.longitude);
-      if (validAddresses.length > 0) {
-        const bounds = L.latLngBounds(
-          validAddresses.map(addr => [addr.latitude, addr.longitude])
-        );
-        mapRef.current.fitBounds(bounds, { padding: [20, 20], maxZoom: 16 });
-      }
+    // Vereinfachte Reset-Funktion ohne automatische Bounds-Anpassung für bessere Performance
+    if (mapRef.current) {
+      mapRef.current.setView([53.3498, 8.8071], 10); // Standard-Position Deutschland
     }
   };
 
