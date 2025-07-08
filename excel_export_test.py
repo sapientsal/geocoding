@@ -120,7 +120,8 @@ def test_excel_export(job_id):
         
         # Check if any system-generated columns are present
         system_columns = ['latitude', 'longitude', 'geocoded', 'geocoding_error', 'formatted_address', 
-                          'geocoded_address', 'Breitengrad', 'Laengengrad', 'Geocodierte_Adresse']
+                          'geocoded_address', 'Breitengrad', 'Laengengrad', 'Geocodierte_Adresse',
+                          'street_clean', 'house_number_numeric', 'house_number_letter']
         
         found_system_columns = [col for col in df.columns if col in system_columns]
         if found_system_columns:
