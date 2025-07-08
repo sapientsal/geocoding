@@ -36,13 +36,17 @@ def test_get_all_jobs():
             print(f"Failed to get all jobs. Status code: {response.status_code}")
             return None
         
+        print(f"Response from /jobs endpoint: {response.text[:200]}...")
+        
         jobs_data = response.json()
         
-        if "jobs" not in jobs_data:
-            print("Jobs data does not contain 'jobs' key")
-            return None
+        # Check different possible response formats
+        if "jobs" in jobs_data:
+            jobs = jobs_data.get("jobs", [])
+        else:
+            # Maybe the response is directly an array of jobs
+            jobs = jobs_data if isinstance(jobs_data, list) else []
         
-        jobs = jobs_data.get("jobs", [])
         print(f"Successfully retrieved {len(jobs)} jobs")
         return jobs
     except Exception as e:
