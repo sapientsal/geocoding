@@ -13,23 +13,56 @@ def test_excel_export():
     """Test Excel export functionality to verify system-generated columns are filtered out"""
     print("\n🔍 Testing Excel Export Functionality...")
     
-    # First, get a list of completed jobs
+    # Upload a test file to get a job ID
     try:
-        response = requests.get(f"{BACKEND_URL}/jobs")
+        print("Uploading test file to get a job ID...")
+        with open('/app/test_addresses.csv', 'rb') as f:
+            files = {'file': ('test_addresses.csv', f, 'text/csv')}
+            response = requests.post(f"{BACKEND_URL}/upload", files=files)
+        
         if response.status_code != 200:
-            print(f"❌ Failed to get jobs. Status code: {response.status_code}")
+            print(f"❌ Failed to upload test file. Status code: {response.status_code}")
+            print(f"Response: {response.text}")
             return
         
-        jobs = response.json().get("jobs", [])
-        completed_jobs = [job for job in jobs if job.get("status") == "completed"]
-        
-        if not completed_jobs:
-            print("❌ No completed jobs found for testing export functionality")
+        job_id = response.json().get("job_id")
+        if not job_id:
+            print("❌ No job ID returned from upload")
             return
         
-        # Use the most recent completed job
-        job_id = completed_jobs[0]["id"]
-        print(f"✅ Found completed job for testing: {job_id}")
+        print(f"✅ Uploaded test file. Job ID: {job_id}")
+        
+        # Wait for job to complete
+        max_attempts = 30
+        polling_interval = 2
+        
+        for attempt in range(max_attempts):
+            print(f"Polling job status (attempt {attempt+1}/{max_attempts})...")
+            response = requests.get(f"{BACKEND_URL}/job/{job_id}")
+            
+            if response.status_code != 200:
+                print(f"❌ Failed to get job status. Status code: {response.status_code}")
+                return
+            
+            job_data = response.json()
+            status = job_data.get("status")
+            
+            print(f"Current job status: {status}")
+            print(f"Processed: {job_data.get('processed_addresses')}/{job_data.get('total_addresses')}")
+            
+            if status == "completed":
+                print("✅ Job completed successfully")
+                break
+            elif status == "error":
+                print(f"❌ Job failed with error: {job_data.get('error_message')}")
+                return
+            
+            time.sleep(polling_interval)
+        else:
+            print("❌ Job did not complete within the expected time")
+            return
+        
+        print(f"✅ Using job ID for testing: {job_id}")
         
         # Test optimized route export
         print("\n🔍 Testing /api/optimized/{job_id}/export endpoint...")
