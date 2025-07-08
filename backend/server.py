@@ -2784,10 +2784,18 @@ async def export_route_excel(job_id: str):
         # Remove default sheet
         wb.remove(wb.active)
         
-        # Get original column structure from first address
+        # Get original column structure from first address, excluding system columns
         original_columns = []
+        system_columns = {
+            'latitude', 'longitude', 'geocoded', 'geocoding_error', 'formatted_address',
+            'geocoded_address', 'Breitengrad', 'Laengengrad', 'Geocodierte_Adresse',
+            'street_clean', 'house_number_numeric', 'house_number_letter', 'Formatierte_Adresse',
+            'Longitude', 'Latitude', 'Geocodiert', 'Geocoding_Fehler'
+        }
+        
         if addresses and addresses[0].get("original_row_data"):
-            original_columns = list(addresses[0]["original_row_data"].keys())
+            all_columns = list(addresses[0]["original_row_data"].keys())
+            original_columns = [col for col in all_columns if col not in system_columns]
         
         # Create optimized route sheet with ALL original columns
         ws_route = wb.create_sheet("Geosortierte Route")
