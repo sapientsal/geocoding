@@ -95,9 +95,9 @@ def test_excel_export(job_id):
             return False
         
         # Get the route data to compare with original columns
-        route_response = requests.get(f"{BACKEND_URL}/route/{job_id}")
+        route_response = requests.get(f"{BACKEND_URL}/optimized/{job_id}")
         if route_response.status_code != 200:
-            log_test("Excel Export", f"Failed to get route data. Status code: {route_response.status_code}", False)
+            log_test("Excel Export", f"Failed to get optimized route data. Status code: {route_response.status_code}", False)
             return False
         
         route_data = route_response.json()
