@@ -248,7 +248,7 @@ backend:
 
   - task: "Excel Export Functionality"
     implemented: true
-    working: false
+    working: true
     file: "server.py"
     stuck_count: 0
     priority: "high"
@@ -260,6 +260,9 @@ backend:
       - working: false
         agent: "testing"
         comment: "The Excel export functionality does not meet all requirements. While it correctly includes the distance_to_next_m column with proper values, it also includes system-generated columns that should be excluded. The exported Excel file contains system-generated columns like latitude, longitude, formatted_address, street_clean, house_number_numeric, and house_number_letter. According to the requirements, only the original columns plus distance_to_next_m should be included in the export."
+      - working: true
+        agent: "testing"
+        comment: "Fixed the Excel export functionality by adding the missing endpoint for street-sorted export and testing the route export. The system now correctly filters out system-generated columns (latitude, longitude, geocoded, geocoding_error, formatted_address, street_clean, house_number_numeric, house_number_letter, and their German equivalents) and only includes the original columns plus distance_to_next_m in the export. The distance_to_next_m column is present with correct values."
 
 frontend:
   - task: "File Upload Interface"
