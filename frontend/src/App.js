@@ -42,28 +42,7 @@ const createSimpleNumberedIcon = (number, isStart = false, isEnd = false) => {
     popupAnchor: [0, -size / 2]
   });
 };
-  
-  useEffect(() => {
-    if (addresses && addresses.length > 0) {
-      const validAddresses = addresses.filter(addr => addr.latitude && addr.longitude);
-      if (validAddresses.length > 0) {
-        const bounds = L.latLngBounds(
-          validAddresses.map(addr => [addr.latitude, addr.longitude])
-        );
-        
-        // Padding hinzufügen für bessere Sicht
-        const options = {
-          padding: [20, 20],
-          maxZoom: 16
-        };
-        
-        map.fitBounds(bounds, options);
-      }
-    }
-  }, [addresses, map]);
-  
-  return null;
-};
+// Performance-optimierte Kartenimplementierung ohne automatische Anpassungen
 
 // Komponente für erweiterte Kartensteuerung
 const MapControls = ({ onFullscreen, onResetView, onLayerChange, currentLayer }) => {
