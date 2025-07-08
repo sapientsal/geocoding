@@ -184,8 +184,8 @@ def run_test():
         # Find a completed job to test export
         completed_jobs = [job for job in jobs if job.get('status') == 'completed']
         if completed_jobs:
-            # Use the most recent completed job
-            test_job = completed_jobs[0]
+            # Try a different job
+            test_job = completed_jobs[1] if len(completed_jobs) > 1 else completed_jobs[0]
             print(f"Using existing job {test_job['id']} for export testing")
             test_excel_export(test_job['id'])
         else:
