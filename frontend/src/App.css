@@ -1,4 +1,4 @@
-/* Custom styles for the Sales Route Optimizer */
+/* Performance-optimized styles - animations removed */
 
 .container {
   max-width: 1200px;
@@ -12,7 +12,7 @@
 }
 
 /* Custom Leaflet Div Icon */
-.custom-div-icon {
+.simple-marker {
   background: none !important;
   border: none !important;
 }
@@ -22,18 +22,14 @@
   z-index: 1000;
 }
 
-/* Upload area animations */
+/* Upload area - static */
 .upload-area {
-  transition: all 0.3s ease;
+  /* Removed transition for performance */
 }
 
-.upload-area:hover {
-  transform: translateY(-2px);
-}
-
-/* Progress bar animations */
+/* Progress bar - static */
 .progress-bar {
-  transition: width 0.5s ease-in-out;
+  /* Removed transition for performance */
 }
 
 /* Status badges */
