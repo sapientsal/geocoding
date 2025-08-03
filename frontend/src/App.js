@@ -601,6 +601,63 @@ function App() {
     }
   };
 
+  const fetchFailedAddresses = async (jobId) => {
+    try {
+      const response = await fetch(`${BACKEND_URL}/api/job/${jobId}/failed-addresses`);
+      if (response.ok) {
+        const data = await response.json();
+        setFailedAddresses(data);
+        setShowFailedAddresses(true);
+      } else {
+        console.error('Failed to fetch failed addresses');
+      }
+    } catch (error) {
+      console.error('Error fetching failed addresses:', error);
+    }
+  };
+
+  const downloadFailedAddressesAnalysis = async (jobId) => {
+    try {
+      const response = await fetch(`${BACKEND_URL}/api/job/${jobId}/failed-addresses/export`);
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        const filename = response.headers.get('content-disposition')?.split('filename=')[1]?.replace(/"/g, '') || 'failed_addresses_analysis.xlsx';
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+      } else {
+        console.error('Failed to download failed addresses analysis');
+      }
+    } catch (error) {
+      console.error('Error downloading failed addresses analysis:', error);
+    }
+  };
+
+  const filterFailedAddressesByCategory = (addresses, category) => {
+    if (category === 'all') return addresses;
+    
+    return addresses.filter(address => {
+      const error = address.geocoding_error;
+      if (category === 'Invalid Format' && error.includes('Invalid address format')) return true;
+      if (category === 'Empty Address' && error.includes('Empty address')) return true;
+      if (category === 'Not Found' && error.includes('No results found')) return true;
+      if (category === 'Timeout' && error.toLowerCase().includes('timeout')) return true;
+      if (category === 'Rate Limited' && error.toLowerCase().includes('rate limit')) return true;
+      if (category === 'Other Error' && 
+          !error.includes('Invalid address format') && 
+          !error.includes('Empty address') && 
+          !error.includes('No results found') && 
+          !error.toLowerCase().includes('timeout') && 
+          !error.toLowerCase().includes('rate limit')) return true;
+      return false;
+    });
+  };
+
   const fetchJobLogs = async (jobId) => {
     try {
       const response = await fetch(`${BACKEND_URL}/api/job/${jobId}/logs?recent=100`);
