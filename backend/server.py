@@ -714,6 +714,67 @@ def calculate_distance_meters(lat1: float, lon1: float, lat2: float, lon2: float
     
     return R * c
 
+def validate_and_clean_german_address(address: str) -> dict:
+    """
+    Validate and clean German address format for better geocoding results
+    """
+    try:
+        # Basic validation
+        if not address or not address.strip():
+            return {
+                'is_valid': False,
+                'cleaned_address': address,
+                'error': 'Empty address'
+            }
+        
+        address_clean = address.strip()
+        
+        # Check for minimum address components (street name and city/postal code)
+        if len(address_clean) < 5:
+            return {
+                'is_valid': False,
+                'cleaned_address': address,
+                'error': 'Address too short'
+            }
+        
+        # Basic German address pattern validation
+        # Should contain at least some letters and potentially numbers
+        if not any(c.isalpha() for c in address_clean):
+            return {
+                'is_valid': False,
+                'cleaned_address': address,
+                'error': 'No alphabetic characters found'
+            }
+        
+        # Clean common formatting issues
+        # Remove extra whitespace
+        address_clean = ' '.join(address_clean.split())
+        
+        # Normalize German characters and common abbreviations
+        replacements = {
+            'ß': 'ss',
+            'Str.': 'Straße',
+            'str.': 'straße',
+            'Pl.': 'Platz',
+            'pl.': 'platz'
+        }
+        
+        for old, new in replacements.items():
+            address_clean = address_clean.replace(old, new)
+        
+        return {
+            'is_valid': True,
+            'cleaned_address': address_clean,
+            'error': None
+        }
+        
+    except Exception as e:
+        return {
+            'is_valid': False,
+            'cleaned_address': address,
+            'error': f'Validation error: {str(e)}'
+        }
+
 async def geocode_address_with_cache(address: str) -> dict:
     """
     Ultra-robust geocoding with comprehensive monitoring and error handling
