@@ -3337,7 +3337,7 @@ async def get_route(job_id: str):
         })
     
     return {
-        "id": route.get("_id"),
+        "id": str(route.get("_id")),
         "job_id": job_id,
         "addresses": address_objects,
         "optimized_addresses": address_objects,  # Same as addresses since they're already optimized
