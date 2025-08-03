@@ -2825,8 +2825,8 @@ async def upload_file(
     
     upload_jobs_collection.insert_one(job)
     
-    # Start background processing
-    background_tasks.add_task(process_upload_job, job_id, file_content, file.filename)
+    # Start background processing with enhanced geocoding
+    background_tasks.add_task(process_geographic_optimization_job, job_id, file_content, file.filename)
     
     return {"job_id": job_id, "message": "File uploaded successfully, processing started"}
 
