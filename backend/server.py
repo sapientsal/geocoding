@@ -835,25 +835,34 @@ async def geocode_address_with_cache(address: str, job_logger: JobLogger = None)
                     sock_read=30
                 )
                 connector = aiohttp.TCPConnector(
-                    limit=5,
-                    limit_per_host=3,
+                    limit=100,
+                    limit_per_host=30,
                     ttl_dns_cache=300,
                     use_dns_cache=True,
-                    keepalive_timeout=30,
-                    enable_cleanup_closed=True
                 )
                 
                 async with aiohttp.ClientSession(
                     timeout=timeout_obj,
                     connector=connector,
-                    headers={'User-Agent': 'SalesRouteOptimizer/2.0 (Production)'}
+                    headers={'User-Agent': 'Sales Route Optimizer v1.0'}
                 ) as session:
                     
-                    # Enhanced URL encoding and API request
-                    encoded_address = urllib.parse.quote_plus(address_clean)
-                    url = f"https://nominatim.openstreetmap.org/search?q={encoded_address}&format=json&limit=1&addressdetails=1&accept-language=de,en"
+                    # Use Nominatim API with German locale preference
+                    url = "https://nominatim.openstreetmap.org/search"
+                    params = {
+                        'q': address_clean,
+                        'format': 'json',
+                        'limit': 1,
+                        'countrycodes': 'de',  # Restrict to Germany for better results
+                        'addressdetails': 1,
+                        'extratags': 1,
+                        'accept-language': 'de,en'
+                    }
                     
-                    async with session.get(url) as response:
+                    if job_logger:
+                        job_logger.log('INFO', f'Geocoding attempt {attempt + 1}/{max_retries}', address=address_clean)
+                    
+                    async with session.get(url, params=params) as response:
                         if response.status == 200:
                             data = await response.json()
                             
