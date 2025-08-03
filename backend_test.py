@@ -1233,6 +1233,285 @@ def create_test_german_job_for_logging():
         print(f"❌ Failed to create test job: {str(e)}")
         return None
 
+def test_enhanced_geocoding_with_german_validation():
+    """Test the enhanced geocoding system with German address validation and logging"""
+    print("\n🔍 Testing Enhanced Geocoding System with German Address Validation...")
+    print("=" * 80)
+    
+    try:
+        # Create test CSV with problematic German addresses as specified in the review
+        test_addresses = [
+            ["Projektname Strasse", "Hausnummer", "Zusatz", "PLZ", "Ort"],
+            # Addresses with decimal house numbers
+            ["Worpswede Hauptstraße", "1.0", "", "27726", "Worpswede"],
+            ["Worpswede Bergstraße", "5.5", "", "27726", "Worpswede"],
+            # Addresses with abbreviations
+            ["Worpswede Str.", "10", "", "27726", "Worpswede"],
+            ["Worpswede Pl.", "3", "", "27726", "Worpswede"],
+            # Addresses with German characters
+            ["Worpswede Mühlstraße", "8", "", "27726", "Worpswede"],
+            ["Worpswede Königstraße", "15", "", "27726", "Worpswede"],
+            ["Worpswede Bäckerstraße", "22", "", "27726", "Worpswede"],
+            # Invalid/incomplete addresses
+            ["", "12", "", "27726", "Worpswede"],  # Empty street
+            ["Worpswede Teststraße", "", "", "27726", "Worpswede"],  # Missing house number
+            ["Worpswede Invalidstraße", "999", "", "", ""],  # Missing PLZ and Ort
+            ["", "", "", "", ""],  # Completely empty
+            # Valid addresses for comparison
+            ["Worpswede Am Hörenberg", "8", "", "27726", "Worpswede"],
+            ["Worpswede Hembergerstraße", "29", "A", "27726", "Worpswede"],
+        ]
+        
+        # Create CSV content
+        csv_content = ""
+        for row in test_addresses:
+            csv_content += ",".join([f'"{cell}"' for cell in row]) + "\n"
+        
+        print(f"📋 Created test file with {len(test_addresses)-1} addresses including:")
+        print("  - Addresses with decimal house numbers (1.0, 5.5)")
+        print("  - Addresses with abbreviations (Str., Pl.)")
+        print("  - Addresses with German characters (ß, ä, ö, ü)")
+        print("  - Invalid/incomplete addresses")
+        
+        # Upload the test file
+        files = {
+            'file': ('enhanced_geocoding_test.csv', csv_content, 'text/csv')
+        }
+        
+        response = requests.post(f"{BACKEND_URL}/upload", files=files)
+        
+        if response.status_code != 200:
+            log_test("Enhanced Geocoding System", f"File upload failed with status code: {response.status_code}", False)
+            print(f"Response: {response.text}")
+            return None
+        
+        job_id = response.json().get("job_id")
+        log_test("Enhanced Geocoding System", f"Test file uploaded successfully. Job ID: {job_id}")
+        
+        # Wait for job to complete with detailed monitoring
+        max_attempts = 40
+        polling_interval = 3
+        
+        for attempt in range(max_attempts):
+            print(f"Polling job status (attempt {attempt+1}/{max_attempts})...")
+            response = requests.get(f"{BACKEND_URL}/job/{job_id}")
+            
+            if response.status_code != 200:
+                log_test("Enhanced Geocoding System", f"Failed to get job status. Status code: {response.status_code}", False)
+                return None
+            
+            job_data = response.json()
+            status = job_data.get("status")
+            processed = job_data.get("processed_addresses", 0)
+            total = job_data.get("total_addresses", 0)
+            geocoded = job_data.get("geocoded_addresses", 0)
+            
+            print(f"Status: {status}, Processed: {processed}/{total}, Geocoded: {geocoded}")
+            
+            # Check if job is completed or failed
+            if status == "completed":
+                log_test("Enhanced Geocoding System", f"Job completed. Processed {processed} addresses, geocoded {geocoded}")
+                break
+            elif status == "error":
+                log_test("Enhanced Geocoding System", f"Job failed with error: {job_data.get('error_message')}", False)
+                return None
+            
+            time.sleep(polling_interval)
+        
+        # Test detailed logging via /api/job/{job_id}/logs endpoint
+        print(f"\n📋 Testing detailed logging via /api/job/{job_id}/logs endpoint...")
+        logs_response = requests.get(f"{BACKEND_URL}/job/{job_id}/logs")
+        
+        if logs_response.status_code != 200:
+            log_test("Enhanced Geocoding System", f"Failed to get job logs. Status code: {logs_response.status_code}", False)
+            print(f"Response: {logs_response.text}")
+        else:
+            logs_data = logs_response.json()
+            logs = logs_data.get("logs", [])
+            
+            print(f"📊 Retrieved {len(logs)} log entries")
+            
+            if len(logs) == 0:
+                log_test("Enhanced Geocoding System", "No logs found - JobLogger integration may not be working", False)
+            else:
+                log_test("Enhanced Geocoding System", f"JobLogger integration working - found {len(logs)} log entries")
+                
+                # Analyze log levels and content
+                log_levels = {}
+                validation_logs = []
+                geocoding_logs = []
+                error_logs = []
+                
+                for log_entry in logs:
+                    level = log_entry.get("level", "")
+                    message = log_entry.get("message", "")
+                    address = log_entry.get("address", "")
+                    
+                    # Count log levels
+                    log_levels[level] = log_levels.get(level, 0) + 1
+                    
+                    # Categorize logs
+                    if "validation" in message.lower() or "cleaned" in message.lower():
+                        validation_logs.append(log_entry)
+                    elif "geocoding" in message.lower():
+                        geocoding_logs.append(log_entry)
+                    elif level in ["ERROR", "CRITICAL"]:
+                        error_logs.append(log_entry)
+                
+                print(f"\n📊 Log Level Distribution:")
+                for level, count in log_levels.items():
+                    print(f"  - {level}: {count} entries")
+                
+                # Test German address validation logging
+                if validation_logs:
+                    log_test("Enhanced Geocoding System", f"German address validation logging working - found {len(validation_logs)} validation entries")
+                    
+                    print(f"\n📋 Sample validation log entries:")
+                    for i, log_entry in enumerate(validation_logs[:5]):
+                        message = log_entry.get("message", "")
+                        address = log_entry.get("address", "")
+                        print(f"  {i+1}. {message}")
+                        if address:
+                            print(f"      Address: {address}")
+                else:
+                    log_test("Enhanced Geocoding System", "No validation logs found - German address validation logging may not be working", False)
+                
+                # Test comprehensive geocoding logging
+                if geocoding_logs:
+                    log_test("Enhanced Geocoding System", f"Comprehensive geocoding logging working - found {len(geocoding_logs)} geocoding entries")
+                    
+                    print(f"\n📋 Sample geocoding log entries:")
+                    for i, log_entry in enumerate(geocoding_logs[:5]):
+                        level = log_entry.get("level", "")
+                        message = log_entry.get("message", "")
+                        address = log_entry.get("address", "")
+                        print(f"  {i+1}. [{level}] {message}")
+                        if address:
+                            print(f"      Address: {address}")
+                else:
+                    log_test("Enhanced Geocoding System", "No geocoding logs found - comprehensive geocoding logging may not be working", False)
+                
+                # Test error pattern identification
+                if error_logs:
+                    log_test("Enhanced Geocoding System", f"Error logging working - found {len(error_logs)} error entries")
+                    
+                    print(f"\n🚨 Error log entries:")
+                    for i, log_entry in enumerate(error_logs[:5]):
+                        level = log_entry.get("level", "")
+                        message = log_entry.get("message", "")
+                        address = log_entry.get("address", "")
+                        print(f"  {i+1}. [{level}] {message}")
+                        if address:
+                            print(f"      Address: {address}")
+                else:
+                    print(f"\n✅ No critical errors found in logs")
+        
+        # Get route data to analyze validation and geocoding results
+        print(f"\n📋 Analyzing geocoding results...")
+        response = requests.get(f"{BACKEND_URL}/route/{job_id}")
+        
+        if response.status_code != 200:
+            log_test("Enhanced Geocoding System", f"Failed to get route data. Status code: {response.status_code}", False)
+            return None
+        
+        route_data = response.json()
+        addresses = route_data.get("addresses", [])
+        
+        if not addresses:
+            log_test("Enhanced Geocoding System", "No addresses found in route data", False)
+            return None
+        
+        # Analyze validation and geocoding results
+        successful_geocoding = []
+        failed_geocoding = []
+        validation_failures = []
+        
+        for addr in addresses:
+            original = addr.get("original_address", "")
+            geocoded = addr.get("geocoded", False)
+            error = addr.get("geocoding_error", "")
+            
+            if geocoded:
+                successful_geocoding.append(addr)
+            else:
+                failed_geocoding.append(addr)
+                
+                # Check if failure was due to validation
+                if error and ("validation" in error.lower() or "invalid" in error.lower()):
+                    validation_failures.append(addr)
+        
+        success_rate = (len(successful_geocoding) / len(addresses)) * 100 if addresses else 0
+        
+        print(f"\n📊 Geocoding Results Analysis:")
+        print(f"  - Total addresses: {len(addresses)}")
+        print(f"  - Successfully geocoded: {len(successful_geocoding)} ({success_rate:.1f}%)")
+        print(f"  - Failed geocoding: {len(failed_geocoding)}")
+        print(f"  - Validation failures: {len(validation_failures)}")
+        
+        # Test specific validation cases
+        print(f"\n🔍 Testing specific validation cases:")
+        
+        # Check if addresses with decimal house numbers were handled
+        decimal_addresses = [addr for addr in addresses if "1.0" in addr.get("original_address", "") or "5.5" in addr.get("original_address", "")]
+        if decimal_addresses:
+            print(f"  - Decimal house numbers: Found {len(decimal_addresses)} addresses")
+            for addr in decimal_addresses:
+                original = addr.get("original_address", "")
+                geocoded = addr.get("geocoded", False)
+                error = addr.get("geocoding_error", "")
+                print(f"    • '{original}' - {'✅ Geocoded' if geocoded else f'❌ Failed: {error}'}")
+        
+        # Check if abbreviations were normalized
+        abbrev_addresses = [addr for addr in addresses if "Str." in addr.get("original_address", "") or "Pl." in addr.get("original_address", "")]
+        if abbrev_addresses:
+            print(f"  - Abbreviations: Found {len(abbrev_addresses)} addresses")
+            for addr in abbrev_addresses:
+                original = addr.get("original_address", "")
+                geocoded = addr.get("geocoded", False)
+                error = addr.get("geocoding_error", "")
+                print(f"    • '{original}' - {'✅ Geocoded' if geocoded else f'❌ Failed: {error}'}")
+        
+        # Check if German characters were handled
+        german_char_addresses = [addr for addr in addresses if any(char in addr.get("original_address", "") for char in ["ß", "ä", "ö", "ü", "Ä", "Ö", "Ü"])]
+        if german_char_addresses:
+            print(f"  - German characters: Found {len(german_char_addresses)} addresses")
+            for addr in german_char_addresses:
+                original = addr.get("original_address", "")
+                geocoded = addr.get("geocoded", False)
+                error = addr.get("geocoding_error", "")
+                print(f"    • '{original}' - {'✅ Geocoded' if geocoded else f'❌ Failed: {error}'}")
+        
+        # Check if invalid addresses were caught by validation
+        if validation_failures:
+            log_test("Enhanced Geocoding System", f"Address validation working - caught {len(validation_failures)} invalid addresses")
+            print(f"  - Validation caught invalid addresses:")
+            for addr in validation_failures[:3]:
+                original = addr.get("original_address", "")
+                error = addr.get("geocoding_error", "")
+                print(f"    • '{original}' - {error}")
+        else:
+            print(f"  - No validation failures detected (this could be normal if all addresses were valid)")
+        
+        # Overall assessment
+        if success_rate >= 70:  # Expect at least 70% success rate given some addresses are intentionally invalid
+            log_test("Enhanced Geocoding System", f"Enhanced geocoding system working well - {success_rate:.1f}% success rate")
+        elif success_rate >= 50:
+            log_test("Enhanced Geocoding System", f"Enhanced geocoding system partially working - {success_rate:.1f}% success rate")
+        else:
+            log_test("Enhanced Geocoding System", f"Enhanced geocoding system needs improvement - only {success_rate:.1f}% success rate", False)
+        
+        # Clean up
+        print(f"\n🧹 Cleaning up test job...")
+        requests.delete(f"{BACKEND_URL}/job/{job_id}")
+        
+        return job_id
+        
+    except Exception as e:
+        log_test("Enhanced Geocoding System", f"Enhanced geocoding testing failed with error: {str(e)}", False)
+        import traceback
+        traceback.print_exc()
+        return None
+
 def run_all_tests():
     """Run all tests in sequence"""
     print("\n🚀 Starting Sales Route Optimization Backend API Tests")
@@ -1240,6 +1519,12 @@ def run_all_tests():
     
     # Skip health check as it's not implemented
     print("\n🔍 Skipping health check endpoint (not implemented)")
+    
+    # PRIORITY: Test Enhanced Geocoding System with German Address Validation
+    print("\n" + "=" * 80)
+    print("🇩🇪 Testing Enhanced Geocoding System with German Address Validation")
+    print("=" * 80)
+    enhanced_geocoding_job_id = test_enhanced_geocoding_with_german_validation()
     
     # PRIORITY: Investigate Helmstedt geocoding failures
     print("\n" + "=" * 80)
