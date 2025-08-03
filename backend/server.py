@@ -3099,6 +3099,194 @@ async def export_route_excel(job_id: str):
         print(f"Excel export error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Excel export error: {str(e)}")
 
+@app.get("/api/job/{job_id}/failed-addresses")
+async def get_failed_addresses(job_id: str):
+    """Get detailed analysis of failed geocoding addresses for manual review"""
+    try:
+        # Check if job exists
+        job = upload_jobs_collection.find_one({"id": job_id})
+        if not job:
+            raise HTTPException(status_code=404, detail="Job not found")
+        
+        # Get all addresses for this job
+        addresses = list(addresses_collection.find({"job_id": job_id}))
+        if not addresses:
+            raise HTTPException(status_code=404, detail="No addresses found for this job")
+        
+        # Filter failed addresses and get detailed information
+        failed_addresses = []
+        for address in addresses:
+            if not address.get('geocoded', False):
+                failed_info = {
+                    'id': address.get('id'),
+                    'original_address': address.get('original_address', ''),
+                    'row_data': address.get('row_data', {}),
+                    'geocoding_error': address.get('geocoding_error', 'Unknown error'),
+                    'formatted_address': address.get('formatted_address', ''),
+                    'address_components': {
+                        'street': address.get('row_data', {}).get('Projektname Strasse', ''),
+                        'house_number': address.get('row_data', {}).get('Hausnummer', ''),
+                        'zusatz': address.get('row_data', {}).get('Zusatz', ''),
+                        'postal_code': address.get('row_data', {}).get('PLZ', ''),
+                        'city': address.get('row_data', {}).get('Ort', '')
+                    }
+                }
+                failed_addresses.append(failed_info)
+        
+        # Get job logs for additional context
+        job_logger = JobLogger(job_id)
+        logs = job_logger.get_logs()
+        
+        # Filter logs related to failed addresses
+        error_logs = []
+        for log in logs:
+            if log.get('level') in ['WARNING', 'ERROR', 'CRITICAL']:
+                log_address = log.get('address', '')
+                # Try to match log entries to failed addresses
+                for failed in failed_addresses:
+                    if failed['original_address'] in log_address or log_address in failed['original_address']:
+                        error_logs.append({
+                            'address': log_address,
+                            'level': log.get('level'),
+                            'message': log.get('message'),
+                            'timestamp': log.get('timestamp')
+                        })
+                        break
+        
+        # Calculate statistics
+        total_addresses = len(addresses)
+        failed_count = len(failed_addresses)
+        success_count = total_addresses - failed_count
+        failure_rate = (failed_count / total_addresses * 100) if total_addresses > 0 else 0
+        
+        # Categorize failures by error type
+        error_categories = {}
+        for failed in failed_addresses:
+            error = failed['geocoding_error']
+            if 'Invalid address format' in error:
+                category = 'Invalid Format'
+            elif 'Empty address' in error:
+                category = 'Empty Address'
+            elif 'No results found' in error:
+                category = 'Not Found'
+            elif 'timeout' in error.lower():
+                category = 'Timeout'
+            elif 'rate limit' in error.lower():
+                category = 'Rate Limited'
+            else:
+                category = 'Other Error'
+            
+            if category not in error_categories:
+                error_categories[category] = []
+            error_categories[category].append(failed)
+        
+        response_data = {
+            'job_id': job_id,
+            'job_info': {
+                'filename': job.get('filename', 'Unknown'),
+                'status': job.get('status', 'Unknown'),
+                'created_at': job.get('created_at'),
+                'completed_at': job.get('completed_at')
+            },
+            'statistics': {
+                'total_addresses': total_addresses,
+                'successful_geocoding': success_count,
+                'failed_geocoding': failed_count,
+                'failure_rate': round(failure_rate, 2)
+            },
+            'error_categories': {
+                category: {
+                    'count': len(addresses),
+                    'percentage': round(len(addresses) / failed_count * 100, 1) if failed_count > 0 else 0
+                }
+                for category, addresses in error_categories.items()
+            },
+            'failed_addresses': failed_addresses,
+            'error_logs': error_logs[:50],  # Limit to last 50 error logs
+            'detailed_breakdown': error_categories
+        }
+        
+        return response_data
+        
+    except Exception as e:
+        print(f"Error getting failed addresses: {e}")
+        raise HTTPException(status_code=500, detail=f"Error retrieving failed addresses: {str(e)}")
+
+@app.get("/api/job/{job_id}/failed-addresses/export")
+async def export_failed_addresses(job_id: str):
+    """Export failed addresses analysis as Excel file"""
+    try:
+        # Get failed addresses data
+        failed_data = await get_failed_addresses(job_id)
+        
+        # Create Excel file with detailed analysis
+        output = BytesIO()
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            
+            # Failed Addresses Sheet
+            failed_df_data = []
+            for failed in failed_data['failed_addresses']:
+                row = {
+                    'Original_Address': failed['original_address'],
+                    'Error_Reason': failed['geocoding_error'],
+                    'Street': failed['address_components']['street'],
+                    'House_Number': failed['address_components']['house_number'],
+                    'Additional': failed['address_components']['zusatz'],
+                    'Postal_Code': failed['address_components']['postal_code'],
+                    'City': failed['address_components']['city']
+                }
+                failed_df_data.append(row)
+            
+            failed_df = pd.DataFrame(failed_df_data)
+            failed_df.to_excel(writer, sheet_name='Failed Addresses', index=False)
+            
+            # Statistics Sheet
+            stats_data = [
+                ['Total Addresses', failed_data['statistics']['total_addresses']],
+                ['Successful Geocoding', failed_data['statistics']['successful_geocoding']],
+                ['Failed Geocoding', failed_data['statistics']['failed_geocoding']],
+                ['Failure Rate (%)', failed_data['statistics']['failure_rate']],
+                ['', ''],
+                ['Error Categories', 'Count'],
+            ]
+            
+            for category, info in failed_data['error_categories'].items():
+                stats_data.append([category, info['count']])
+            
+            stats_df = pd.DataFrame(stats_data, columns=['Metric', 'Value'])
+            stats_df.to_excel(writer, sheet_name='Statistics', index=False)
+            
+            # Error Logs Sheet
+            if failed_data['error_logs']:
+                logs_df_data = []
+                for log in failed_data['error_logs']:
+                    logs_df_data.append({
+                        'Timestamp': log['timestamp'],
+                        'Level': log['level'],
+                        'Address': log['address'],
+                        'Message': log['message']
+                    })
+                
+                logs_df = pd.DataFrame(logs_df_data)
+                logs_df.to_excel(writer, sheet_name='Error Logs', index=False)
+        
+        output.seek(0)
+        
+        # Prepare filename
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        job_filename = failed_data['job_info']['filename'].replace('.xlsx', '').replace('.csv', '')
+        filename = f"failed_addresses_analysis_{job_filename}_{timestamp}.xlsx"
+        
+        return StreamingResponse(
+            BytesIO(output.read()),
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": f"attachment; filename={filename}"}
+        )
+        
+    except Exception as e:
+        print(f"Error exporting failed addresses: {e}")
+        raise HTTPException(status_code=500, detail=f"Error exporting failed addresses: {str(e)}")
+
 @app.get("/api/route/{job_id}")
 async def get_route(job_id: str):
     """Get optimized route for a job"""
