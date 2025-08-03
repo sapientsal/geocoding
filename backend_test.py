@@ -1123,6 +1123,12 @@ def run_all_tests():
     # Skip health check as it's not implemented
     print("\n🔍 Skipping health check endpoint (not implemented)")
     
+    # PRIORITY: Investigate Helmstedt geocoding failures
+    print("\n" + "=" * 80)
+    print("🚨 INVESTIGATING HELMSTEDT GEOCODING FAILURES")
+    print("=" * 80)
+    helmstedt_investigation = investigate_helmstedt_geocoding_failures()
+    
     # Test specific street-based sorting
     print("\n" + "=" * 80)
     print("🛣️ Testing Specific Street-Based Sorting")
