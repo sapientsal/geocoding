@@ -239,13 +239,13 @@ def test_get_all_jobs():
             log_test("Database Operations", f"Failed to get all jobs. Status code: {response.status_code}", False)
             return None
         
-        jobs_data = response.json()
+        jobs_data = response.json()  # This is directly a list
         
-        if "jobs" not in jobs_data:
-            log_test("Database Operations", "Jobs data does not contain 'jobs' key", False)
+        if not isinstance(jobs_data, list):
+            log_test("Database Operations", "Jobs data is not a list as expected", False)
             return None
         
-        jobs = jobs_data.get("jobs", [])
+        jobs = jobs_data
         log_test("Database Operations", f"Successfully retrieved {len(jobs)} jobs")
         return jobs
     except Exception as e:
