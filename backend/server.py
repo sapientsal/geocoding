@@ -1821,6 +1821,9 @@ async def process_street_sorted_job(job_id: str, file_content: bytes, filename: 
             }}
         )
         
+        # Create job logger for monitoring
+        job_logger = JobLogger(job_id)
+        
         # Geocode all addresses
         geocoded_data = []
         geocoded_count = 0
@@ -1828,7 +1831,7 @@ async def process_street_sorted_job(job_id: str, file_content: bytes, filename: 
         for i, address in enumerate(addresses_to_geocode):
             try:
                 print(f"Geocoding address {i+1}/{total_addresses}: {address}")
-                geocoded = await geocode_address_with_cache(address)
+                geocoded = await geocode_address_with_cache(address, job_logger)
                 
                 # Extract street name from geocoded result if available
                 street_name = ""
