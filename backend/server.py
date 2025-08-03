@@ -930,25 +930,37 @@ async def geocode_address_with_cache(address: str, job_logger: JobLogger = None)
                             
             except asyncio.TimeoutError:
                 if attempt == max_retries - 1:
+                    if job_logger:
+                        job_logger.log('CRITICAL', f'Geocoding timeout after {max_retries} attempts', address=address_clean)
                     break
                 
                 delay = base_delay * (3 ** attempt)
+                if job_logger:
+                    job_logger.log('WARNING', f'Timeout error, waiting {delay:.1f}s before retry {attempt + 1}', address=address_clean)
                 await asyncio.sleep(min(delay, 30))
                 continue
                 
             except aiohttp.ClientError as e:
                 if attempt == max_retries - 1:
+                    if job_logger:
+                        job_logger.log('CRITICAL', f'Client error after {max_retries} attempts: {str(e)}', address=address_clean)
                     break
                 
                 delay = base_delay * (2 ** attempt)
+                if job_logger:
+                    job_logger.log('WARNING', f'Client error, waiting {delay:.1f}s before retry {attempt + 1}', address=address_clean)
                 await asyncio.sleep(min(delay, 20))
                 continue
                 
             except Exception as e:
                 if attempt == max_retries - 1:
+                    if job_logger:
+                        job_logger.log('CRITICAL', f'Unexpected error after {max_retries} attempts: {str(e)}', address=address_clean)
                     break
                 
                 delay = base_delay * (2 ** attempt)
+                if job_logger:
+                    job_logger.log('WARNING', f'Unexpected error, waiting {delay:.1f}s before retry {attempt + 1}', address=address_clean)
                 await asyncio.sleep(min(delay, 15))
                 continue
         
