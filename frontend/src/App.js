@@ -1213,7 +1213,7 @@ function App() {
                     <div className="flex space-x-3">
                       <button
                         onClick={() => fetchOptimizedRoute(job.id)}
-                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                        className="px-4 py-2 bg-blue-600 text-white rounded-lg"
                       >
                         📊 Route anzeigen
                       </button>
@@ -1222,16 +1222,25 @@ function App() {
                           fetchOptimizedRoute(job.id);
                           setShowMap(true);
                         }}
-                        className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+                        className="px-4 py-2 bg-purple-600 text-white rounded-lg"
                       >
                         🗺️ Karte anzeigen
                       </button>
                       <button
                         onClick={() => downloadExcel(job.id)}
-                        className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                        className="px-4 py-2 bg-green-600 text-white rounded-lg"
                       >
                         📊 Excel Export
                       </button>
+                      {(job.total_addresses - job.geocoded_addresses) > 0 && (
+                        <button
+                          onClick={() => fetchFailedAddresses(job.id)}
+                          className="px-4 py-2 bg-orange-600 text-white rounded-lg"
+                          title={`${job.total_addresses - job.geocoded_addresses} fehlgeschlagene Adressen analysieren`}
+                        >
+                          🔍 Fehler-Analyse ({job.total_addresses - job.geocoded_addresses})
+                        </button>
+                      )}
                     </div>
                   )}
                   
