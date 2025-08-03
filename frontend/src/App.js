@@ -1660,6 +1660,154 @@ function App() {
             </div>
           </div>
         )}
+
+        {/* Manual Review Modal für fehlgeschlagene Adressen */}
+        {showFailedAddresses && failedAddresses && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg max-w-6xl max-h-[90vh] w-full overflow-hidden">
+              <div className="p-6 border-b border-gray-200 flex justify-between items-center">
+                <div>
+                  <h2 className="text-2xl font-semibold text-gray-800">🔍 Fehler-Analyse: Fehlgeschlagene Adressen</h2>
+                  <p className="text-sm text-gray-600 mt-1">
+                    {failedAddresses.job_info.filename} - {failedAddresses.statistics.failed_geocoding} von {failedAddresses.statistics.total_addresses} Adressen fehlgeschlagen ({failedAddresses.statistics.failure_rate}%)
+                  </p>
+                </div>
+                <div className="flex space-x-2">
+                  <button
+                    onClick={() => downloadFailedAddressesAnalysis(failedAddresses.job_id)}
+                    className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm"
+                    title="Detaillierte Analyse als Excel exportieren"
+                  >
+                    📊 Excel Export
+                  </button>
+                  <button
+                    onClick={() => setShowFailedAddresses(false)}
+                    className="text-gray-500 text-2xl p-2 rounded-lg"
+                  >
+                    ×
+                  </button>
+                </div>
+              </div>
+              
+              <div className="p-6 overflow-y-auto max-h-[calc(90vh-200px)]">
+                {/* Statistik-Übersicht */}
+                <div className="mb-6 grid grid-cols-4 gap-4">
+                  <div className="bg-gray-50 rounded-lg p-4 text-center">
+                    <div className="text-2xl font-bold text-gray-700">{failedAddresses.statistics.total_addresses}</div>
+                    <div className="text-sm text-gray-600">Gesamt</div>
+                  </div>
+                  <div className="bg-green-50 rounded-lg p-4 text-center">
+                    <div className="text-2xl font-bold text-green-600">{failedAddresses.statistics.successful_geocoding}</div>
+                    <div className="text-sm text-gray-600">Erfolgreich</div>
+                  </div>
+                  <div className="bg-red-50 rounded-lg p-4 text-center">
+                    <div className="text-2xl font-bold text-red-600">{failedAddresses.statistics.failed_geocoding}</div>
+                    <div className="text-sm text-gray-600">Fehlgeschlagen</div>
+                  </div>
+                  <div className="bg-orange-50 rounded-lg p-4 text-center">
+                    <div className="text-2xl font-bold text-orange-600">{failedAddresses.statistics.failure_rate}%</div>
+                    <div className="text-sm text-gray-600">Fehlerrate</div>
+                  </div>
+                </div>
+
+                {/* Fehler-Kategorien */}
+                <div className="mb-6">
+                  <h3 className="text-lg font-semibold text-gray-800 mb-3">📊 Fehler-Kategorien</h3>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
+                    <button
+                      onClick={() => setSelectedErrorCategory('all')}
+                      className={`p-3 rounded-lg text-sm border ${
+                        selectedErrorCategory === 'all' 
+                          ? 'bg-blue-50 border-blue-300 text-blue-700' 
+                          : 'bg-gray-50 border-gray-200 text-gray-700'
+                      }`}
+                    >
+                      Alle ({failedAddresses.statistics.failed_geocoding})
+                    </button>
+                    {Object.entries(failedAddresses.error_categories).map(([category, info]) => (
+                      <button
+                        key={category}
+                        onClick={() => setSelectedErrorCategory(category)}
+                        className={`p-3 rounded-lg text-sm border ${
+                          selectedErrorCategory === category 
+                            ? 'bg-red-50 border-red-300 text-red-700' 
+                            : 'bg-gray-50 border-gray-200 text-gray-700'
+                        }`}
+                      >
+                        {category} ({info.count})
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Fehlgeschlagene Adressen Liste */}
+                <div className="mb-6">
+                  <h3 className="text-lg font-semibold text-gray-800 mb-3">
+                    📍 Fehlgeschlagene Adressen
+                    {selectedErrorCategory !== 'all' && ` - ${selectedErrorCategory}`}
+                  </h3>
+                  <div className="space-y-3 max-h-96 overflow-y-auto">
+                    {filterFailedAddressesByCategory(failedAddresses.failed_addresses, selectedErrorCategory)
+                      .map((address, index) => (
+                      <div key={address.id} className="border border-red-200 rounded-lg p-4 bg-red-50">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center mb-2">
+                              <span className="w-8 h-8 bg-red-500 text-white rounded-full flex items-center justify-center text-sm font-semibold mr-3">
+                                {index + 1}
+                              </span>
+                              <h4 className="font-semibold text-gray-800">{address.original_address}</h4>
+                            </div>
+                            
+                            <div className="ml-11 space-y-2">
+                              <div className="text-sm text-red-700 bg-red-100 rounded p-2">
+                                <strong>Fehler:</strong> {address.geocoding_error}
+                              </div>
+                              
+                              <div className="grid grid-cols-2 md:grid-cols-5 gap-2 text-xs">
+                                <div>
+                                  <span className="font-medium text-gray-600">Straße:</span>
+                                  <div className="text-gray-800">{address.address_components.street || 'Leer'}</div>
+                                </div>
+                                <div>
+                                  <span className="font-medium text-gray-600">Nr:</span>
+                                  <div className="text-gray-800">{address.address_components.house_number || 'Leer'}</div>
+                                </div>
+                                <div>
+                                  <span className="font-medium text-gray-600">Zusatz:</span>
+                                  <div className="text-gray-800">{address.address_components.zusatz || '-'}</div>
+                                </div>
+                                <div>
+                                  <span className="font-medium text-gray-600">PLZ:</span>
+                                  <div className="text-gray-800">{address.address_components.postal_code || 'Leer'}</div>
+                                </div>
+                                <div>
+                                  <span className="font-medium text-gray-600">Ort:</span>
+                                  <div className="text-gray-800">{address.address_components.city || 'Leer'}</div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Hilfreiche Tipps */}
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <h4 className="font-semibold text-blue-800 mb-2">💡 Tipps zur Verbesserung der Geocoding-Erfolgsrate:</h4>
+                  <ul className="text-sm text-blue-700 space-y-1">
+                    <li>• <strong>Leere Adressen:</strong> Überprüfen Sie die Excel-Datei auf vollständige Adressdaten</li>
+                    <li>• <strong>Ungültiges Format:</strong> Verwenden Sie das Schema "Straße, Hausnummer, PLZ, Ort"</li>
+                    <li>• <strong>Nicht gefunden:</strong> Prüfen Sie Schreibweise und Existenz der Adressen</li>
+                    <li>• <strong>Dezimale Hausnummern:</strong> Verwenden Sie ganze Zahlen (z.B. "1" statt "1.0")</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
