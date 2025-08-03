@@ -868,16 +868,18 @@ async def geocode_address_with_cache(address: str, job_logger: JobLogger = None)
                             
                             if data and len(data) > 0:
                                 result = data[0]
-                                
                                 geocoded_result = {
-                                    'latitude': float(result.get('lat', 0)),
-                                    'longitude': float(result.get('lon', 0)),
+                                    'latitude': float(result['lat']),
+                                    'longitude': float(result['lon']),
                                     'formatted_address': result.get('display_name', address),
                                     'street': result.get('address', {}).get('road', ''),
                                     'city': result.get('address', {}).get('city', ''),
                                     'country': result.get('address', {}).get('country', ''),
                                     'geocoded': True
                                 }
+                                
+                                if job_logger:
+                                    job_logger.log('INFO', f'Geocoding successful: {result.get("display_name", "Unknown location")}', address=address)
                                 
                                 # Cache successful results
                                 address_cache[address] = geocoded_result
@@ -890,6 +892,10 @@ async def geocode_address_with_cache(address: str, job_logger: JobLogger = None)
                                     'geocoded': False,
                                     'error': 'No results found from geocoding service'
                                 }
+                                
+                                if job_logger:
+                                    job_logger.log('WARNING', 'No geocoding results found from OpenStreetMap', address=address_clean)
+                                
                                 address_cache[address] = empty_result
                                 return empty_result
                         
