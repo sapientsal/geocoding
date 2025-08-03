@@ -3108,27 +3108,42 @@ async def get_failed_addresses(job_id: str):
         if not job:
             raise HTTPException(status_code=404, detail="Job not found")
         
-        # Get all addresses for this job
-        addresses = list(addresses_collection.find({"job_id": job_id}))
-        if not addresses:
+        # Get addresses from routes collection (where they are actually stored)
+        route_data = routes_collection.find_one({"job_id": job_id})
+        if not route_data:
+            # Fallback: try addresses collection for older jobs
+            addresses = list(addresses_collection.find({"job_id": job_id}))
+            if not addresses:
+                raise HTTPException(status_code=404, detail="No addresses found for this job")
+            
+            # Convert addresses collection format
+            all_addresses = addresses
+        else:
+            # Use optimized addresses from routes collection
+            all_addresses = route_data.get('optimized_addresses', [])
+        
+        if not all_addresses:
             raise HTTPException(status_code=404, detail="No addresses found for this job")
         
         # Filter failed addresses and get detailed information
         failed_addresses = []
-        for address in addresses:
+        for address in all_addresses:
             if not address.get('geocoded', False):
+                # Handle both old and new data structures
+                row_data = address.get('row_data', address.get('original_row_data', {}))
+                
                 failed_info = {
                     'id': address.get('id'),
                     'original_address': address.get('original_address', ''),
-                    'row_data': address.get('original_row_data', {}),
-                    'geocoding_error': address.get('geocoding_error', 'Unknown error'),
+                    'row_data': row_data,
+                    'geocoding_error': address.get('geocoding_error', address.get('error', 'Unknown error')),
                     'formatted_address': address.get('formatted_address', ''),
                     'address_components': {
-                        'street': address.get('original_row_data', {}).get('Projektname Strasse', ''),
-                        'house_number': address.get('original_row_data', {}).get('Hausnummer', ''),
-                        'zusatz': address.get('original_row_data', {}).get('Zusatz', ''),
-                        'postal_code': address.get('original_row_data', {}).get('PLZ', ''),
-                        'city': address.get('original_row_data', {}).get('Ort', '')
+                        'street': row_data.get('Projektname Strasse', ''),
+                        'house_number': row_data.get('Hausnummer', ''),
+                        'zusatz': row_data.get('Zusatz', ''),
+                        'postal_code': row_data.get('PLZ', ''),
+                        'city': row_data.get('Ort', '')
                     }
                 }
                 failed_addresses.append(failed_info)
@@ -3154,7 +3169,7 @@ async def get_failed_addresses(job_id: str):
                         break
         
         # Calculate statistics
-        total_addresses = len(addresses)
+        total_addresses = len(all_addresses)
         failed_count = len(failed_addresses)
         success_count = total_addresses - failed_count
         failure_rate = (failed_count / total_addresses * 100) if total_addresses > 0 else 0
@@ -3167,7 +3182,7 @@ async def get_failed_addresses(job_id: str):
                 category = 'Invalid Format'
             elif 'Empty address' in error:
                 category = 'Empty Address'
-            elif 'No results found' in error:
+            elif 'No results found' in error or 'No geocoding results found' in error:
                 category = 'Not Found'
             elif 'timeout' in error.lower():
                 category = 'Timeout'
