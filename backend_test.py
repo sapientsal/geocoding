@@ -938,125 +938,155 @@ def investigate_helmstedt_geocoding_failures():
             
             print(f"📊 Retrieved {len(logs)} log entries")
             
-            # Analyze failure patterns
-            error_patterns = {}
-            warning_patterns = {}
-            failed_addresses = []
-            
-            for log_entry in logs:
-                level = log_entry.get("level", "")
-                message = log_entry.get("message", "")
-                address = log_entry.get("address", "")
+            if len(logs) == 0:
+                print("⚠️ No logs found for this job. This suggests the job was processed before enhanced logging was implemented.")
+                print("📋 Attempting to create a new test job with similar data to get better logging...")
                 
-                if level == "ERROR" or level == "CRITICAL":
-                    # Extract error pattern
-                    if "geocoding" in message.lower() or "failed" in message.lower():
-                        error_key = message[:100]  # First 100 chars as pattern key
-                        if error_key not in error_patterns:
-                            error_patterns[error_key] = []
-                        error_patterns[error_key].append({
+                # Create a test job with German addresses to see current logging
+                test_job_id = create_test_german_job_for_logging()
+                if test_job_id:
+                    print(f"📋 Created test job {test_job_id} - checking its logs...")
+                    time.sleep(10)  # Wait for processing
+                    
+                    test_logs_response = requests.get(f"{BACKEND_URL}/job/{test_job_id}/logs")
+                    if test_logs_response.status_code == 200:
+                        test_logs_data = test_logs_response.json()
+                        test_logs = test_logs_data.get("logs", [])
+                        print(f"📊 Test job has {len(test_logs)} log entries")
+                        
+                        # Analyze test job logs for patterns
+                        if test_logs:
+                            print("📋 Sample log entries from test job:")
+                            for i, log_entry in enumerate(test_logs[:10]):
+                                level = log_entry.get("level", "")
+                                message = log_entry.get("message", "")
+                                address = log_entry.get("address", "")
+                                print(f"  {i+1}. [{level}] {message}")
+                                if address:
+                                    print(f"      Address: {address}")
+            else:
+                # Analyze failure patterns from existing logs
+                error_patterns = {}
+                warning_patterns = {}
+                failed_addresses = []
+                
+                for log_entry in logs:
+                    level = log_entry.get("level", "")
+                    message = log_entry.get("message", "")
+                    address = log_entry.get("address", "")
+                    
+                    if level == "ERROR" or level == "CRITICAL":
+                        # Extract error pattern
+                        if "geocoding" in message.lower() or "failed" in message.lower():
+                            error_key = message[:100]  # First 100 chars as pattern key
+                            if error_key not in error_patterns:
+                                error_patterns[error_key] = []
+                            error_patterns[error_key].append({
+                                "address": address,
+                                "message": message,
+                                "timestamp": log_entry.get("timestamp")
+                            })
+                            
+                            if address:
+                                failed_addresses.append(address)
+                    
+                    elif level == "WARNING":
+                        warning_key = message[:100]
+                        if warning_key not in warning_patterns:
+                            warning_patterns[warning_key] = []
+                        warning_patterns[warning_key].append({
                             "address": address,
                             "message": message,
                             "timestamp": log_entry.get("timestamp")
                         })
+                
+                # Report error patterns
+                print(f"\n🚨 ERROR PATTERNS ANALYSIS:")
+                print("=" * 60)
+                
+                if error_patterns:
+                    for pattern, occurrences in error_patterns.items():
+                        print(f"\n📍 Error Pattern: {pattern}")
+                        print(f"   Occurrences: {len(occurrences)}")
                         
-                        if address:
-                            failed_addresses.append(address)
-                
-                elif level == "WARNING":
-                    warning_key = message[:100]
-                    if warning_key not in warning_patterns:
-                        warning_patterns[warning_key] = []
-                    warning_patterns[warning_key].append({
-                        "address": address,
-                        "message": message,
-                        "timestamp": log_entry.get("timestamp")
-                    })
-            
-            # Report error patterns
-            print(f"\n🚨 ERROR PATTERNS ANALYSIS:")
-            print("=" * 60)
-            
-            if error_patterns:
-                for pattern, occurrences in error_patterns.items():
-                    print(f"\n📍 Error Pattern: {pattern}")
-                    print(f"   Occurrences: {len(occurrences)}")
-                    
-                    # Show first few examples
-                    for i, occurrence in enumerate(occurrences[:3]):
-                        print(f"   Example {i+1}: {occurrence['address']}")
-                    
-                    if len(occurrences) > 3:
-                        print(f"   ... and {len(occurrences) - 3} more")
-            else:
-                print("No specific error patterns found in logs")
-            
-            # Report warning patterns
-            print(f"\n⚠️ WARNING PATTERNS ANALYSIS:")
-            print("=" * 60)
-            
-            if warning_patterns:
-                for pattern, occurrences in warning_patterns.items():
-                    print(f"\n📍 Warning Pattern: {pattern}")
-                    print(f"   Occurrences: {len(occurrences)}")
-                    
-                    # Show first few examples
-                    for i, occurrence in enumerate(occurrences[:3]):
-                        if occurrence['address']:
+                        # Show first few examples
+                        for i, occurrence in enumerate(occurrences[:3]):
                             print(f"   Example {i+1}: {occurrence['address']}")
+                        
+                        if len(occurrences) > 3:
+                            print(f"   ... and {len(occurrences) - 3} more")
+                else:
+                    print("No specific error patterns found in logs")
+                
+                # Report warning patterns
+                print(f"\n⚠️ WARNING PATTERNS ANALYSIS:")
+                print("=" * 60)
+                
+                if warning_patterns:
+                    for pattern, occurrences in warning_patterns.items():
+                        print(f"\n📍 Warning Pattern: {pattern}")
+                        print(f"   Occurrences: {len(occurrences)}")
+                        
+                        # Show first few examples
+                        for i, occurrence in enumerate(occurrences[:3]):
+                            if occurrence['address']:
+                                print(f"   Example {i+1}: {occurrence['address']}")
+                        
+                        if len(occurrences) > 3:
+                            print(f"   ... and {len(occurrences) - 3} more")
+                else:
+                    print("No specific warning patterns found in logs")
+                
+                # Analyze failed addresses for common patterns
+                print(f"\n🔍 FAILED ADDRESSES ANALYSIS:")
+                print("=" * 60)
+                
+                if failed_addresses:
+                    print(f"Total failed addresses found in logs: {len(failed_addresses)}")
                     
-                    if len(occurrences) > 3:
-                        print(f"   ... and {len(occurrences) - 3} more")
-            else:
-                print("No specific warning patterns found in logs")
-            
-            # Analyze failed addresses for common patterns
-            print(f"\n🔍 FAILED ADDRESSES ANALYSIS:")
-            print("=" * 60)
-            
-            if failed_addresses:
-                print(f"Total failed addresses found in logs: {len(failed_addresses)}")
-                
-                # Look for common patterns in failed addresses
-                address_patterns = {
-                    "missing_street_numbers": 0,
-                    "invalid_postal_codes": 0,
-                    "empty_or_null": 0,
-                    "special_characters": 0,
-                    "german_format_issues": 0
-                }
-                
-                print(f"\nFirst 10 failed addresses:")
-                for i, addr in enumerate(failed_addresses[:10]):
-                    print(f"  {i+1}. {addr}")
+                    # Look for common patterns in failed addresses
+                    address_patterns = {
+                        "missing_street_numbers": 0,
+                        "invalid_postal_codes": 0,
+                        "empty_or_null": 0,
+                        "special_characters": 0,
+                        "german_format_issues": 0
+                    }
                     
-                    # Analyze patterns
-                    if not addr or addr.strip() == "" or "null" in addr.lower():
-                        address_patterns["empty_or_null"] += 1
-                    elif not any(char.isdigit() for char in addr):
-                        address_patterns["missing_street_numbers"] += 1
-                    elif any(char in addr for char in ['@', '#', '$', '%']):
-                        address_patterns["special_characters"] += 1
-                    elif "," not in addr and len(addr.split()) < 3:
-                        address_patterns["german_format_issues"] += 1
-                
-                print(f"\n📊 Address Pattern Analysis:")
-                for pattern, count in address_patterns.items():
-                    if count > 0:
-                        percentage = (count / len(failed_addresses)) * 100
-                        print(f"  - {pattern.replace('_', ' ').title()}: {count} ({percentage:.1f}%)")
-            else:
-                print("No failed addresses found in logs")
+                    print(f"\nFirst 10 failed addresses:")
+                    for i, addr in enumerate(failed_addresses[:10]):
+                        print(f"  {i+1}. {addr}")
+                        
+                        # Analyze patterns
+                        if not addr or addr.strip() == "" or "null" in addr.lower():
+                            address_patterns["empty_or_null"] += 1
+                        elif not any(char.isdigit() for char in addr):
+                            address_patterns["missing_street_numbers"] += 1
+                        elif any(char in addr for char in ['@', '#', '$', '%']):
+                            address_patterns["special_characters"] += 1
+                        elif "," not in addr and len(addr.split()) < 3:
+                            address_patterns["german_format_issues"] += 1
+                    
+                    print(f"\n📊 Address Pattern Analysis:")
+                    for pattern, count in address_patterns.items():
+                        if count > 0:
+                            percentage = (count / len(failed_addresses)) * 100
+                            print(f"  - {pattern.replace('_', ' ').title()}: {count} ({percentage:.1f}%)")
+                else:
+                    print("No failed addresses found in logs")
         
-        # Get actual addresses from the job to analyze the data
-        print(f"\n📋 Fetching job addresses for data analysis...")
-        route_response = requests.get(f"{BACKEND_URL}/route/{job_id}")
+        # Try alternative approaches to get address data
+        print(f"\n📋 Attempting alternative data access methods...")
         
-        if route_response.status_code == 200:
-            route_data = route_response.json()
-            addresses = route_data.get("addresses", [])
+        # Try the optimized endpoint instead of route
+        print("🔍 Trying /api/optimized/{job_id} endpoint...")
+        optimized_response = requests.get(f"{BACKEND_URL}/optimized/{job_id}")
+        
+        if optimized_response.status_code == 200:
+            optimized_data = optimized_response.json()
+            addresses = optimized_data.get("addresses", [])
             
-            print(f"📊 Retrieved {len(addresses)} addresses from job")
+            print(f"📊 Retrieved {len(addresses)} addresses from optimized endpoint")
             
             # Analyze geocoding success/failure
             successful_geocoding = [addr for addr in addresses if addr.get("geocoded", False)]
@@ -1071,7 +1101,7 @@ def investigate_helmstedt_geocoding_failures():
                 
                 # Group by error type
                 error_types = {}
-                for addr in failed_geocoding[:20]:  # Analyze first 20 failed addresses
+                for addr in failed_geocoding[:50]:  # Analyze first 50 failed addresses
                     error = addr.get("geocoding_error", "Unknown error")
                     original_addr = addr.get("original_address", "")
                     
@@ -1083,15 +1113,49 @@ def investigate_helmstedt_geocoding_failures():
                     print(f"\n📍 Error Type: {error_type}")
                     print(f"   Count: {len(addresses)}")
                     print(f"   Examples:")
-                    for i, addr in enumerate(addresses[:3]):
+                    for i, addr in enumerate(addresses[:5]):
                         print(f"     {i+1}. {addr}")
-                    if len(addresses) > 3:
-                        print(f"     ... and {len(addresses) - 3} more")
+                    if len(addresses) > 5:
+                        print(f"     ... and {len(addresses) - 5} more")
+                        
+                # Look for common patterns in failed addresses
+                print(f"\n🔍 PATTERN ANALYSIS OF FAILED ADDRESSES:")
+                print("=" * 60)
+                
+                patterns = {
+                    "empty_or_null": [],
+                    "missing_house_numbers": [],
+                    "invalid_characters": [],
+                    "incomplete_addresses": [],
+                    "format_issues": []
+                }
+                
+                for addr in failed_geocoding[:50]:
+                    original = addr.get("original_address", "").strip()
+                    
+                    if not original or original.lower() in ['', 'null', 'nan']:
+                        patterns["empty_or_null"].append(original)
+                    elif not any(char.isdigit() for char in original):
+                        patterns["missing_house_numbers"].append(original)
+                    elif any(char in original for char in ['@', '#', '$', '%', '&']):
+                        patterns["invalid_characters"].append(original)
+                    elif len(original.split(',')) < 2:
+                        patterns["incomplete_addresses"].append(original)
+                    else:
+                        patterns["format_issues"].append(original)
+                
+                for pattern_name, pattern_addresses in patterns.items():
+                    if pattern_addresses:
+                        print(f"\n📍 {pattern_name.replace('_', ' ').title()}: {len(pattern_addresses)} addresses")
+                        for i, addr in enumerate(pattern_addresses[:3]):
+                            print(f"   {i+1}. '{addr}'")
+                        if len(pattern_addresses) > 3:
+                            print(f"   ... and {len(pattern_addresses) - 3} more")
         else:
-            print(f"❌ Failed to get job route data. Status code: {route_response.status_code}")
-            print(f"Response: {route_response.text}")
+            print(f"❌ Failed to get optimized data. Status code: {optimized_response.status_code}")
+            print(f"Response: {optimized_response.text}")
             
-            # If route endpoint fails, try to get job details at least
+            # Final fallback - just get job details
             job_response = requests.get(f"{BACKEND_URL}/job/{job_id}")
             if job_response.status_code == 200:
                 job_data = job_response.json()
@@ -1103,17 +1167,24 @@ def investigate_helmstedt_geocoding_failures():
         print(f"\n📋 INVESTIGATION SUMMARY:")
         print("=" * 60)
         print(f"Job ID: {job_id}")
+        print(f"Filename: {target_job['filename']}")
         print(f"Total Addresses: {target_job['total_addresses']}")
         print(f"Successfully Geocoded: {target_job['geocoded_addresses']}")
         print(f"Failed Geocoding: {target_job['failed_addresses']}")
         print(f"Failure Rate: {target_job['failure_rate']:.1f}%")
         
         print(f"\n🔧 RECOMMENDATIONS:")
-        print("- Review the specific error patterns identified above")
-        print("- Check if German address format parsing is working correctly")
-        print("- Verify OpenStreetMap API rate limiting and timeout handling")
-        print("- Consider implementing address validation before geocoding")
-        print("- Add more robust error handling for malformed addresses")
+        print("- The 7.6% failure rate (140 out of 1843 addresses) suggests systematic issues")
+        print("- Most likely causes:")
+        print("  1. German address format parsing issues")
+        print("  2. Invalid or incomplete address data in the source file")
+        print("  3. OpenStreetMap API limitations for specific German locations")
+        print("  4. Missing or malformed postal codes")
+        print("- Recommended actions:")
+        print("  1. Implement pre-geocoding address validation")
+        print("  2. Add fallback geocoding services for failed addresses")
+        print("  3. Improve German address format detection and cleaning")
+        print("  4. Add detailed logging for all geocoding attempts")
         
         return target_job
         
@@ -1121,6 +1192,45 @@ def investigate_helmstedt_geocoding_failures():
         print(f"❌ Investigation failed with error: {str(e)}")
         import traceback
         traceback.print_exc()
+        return None
+
+def create_test_german_job_for_logging():
+    """Create a test job with German addresses to test current logging"""
+    try:
+        print("📋 Creating test German address job for logging analysis...")
+        
+        # Create test CSV with some problematic German addresses
+        test_addresses = [
+            ["Projektname Strasse", "Hausnummer", "Zusatz", "PLZ", "Ort"],
+            ["Worpswede Hauptstraße", "1", "", "27726", "Worpswede"],
+            ["Worpswede Invalidstraße", "", "", "27726", "Worpswede"],  # Missing house number
+            ["Worpswede", "5", "", "", "Worpswede"],  # Missing street name
+            ["", "10", "", "27726", "Worpswede"],  # Empty street
+            ["Worpswede Teststraße", "999", "", "99999", "Nonexistent"],  # Invalid location
+        ]
+        
+        # Create CSV content
+        csv_content = ""
+        for row in test_addresses:
+            csv_content += ",".join(row) + "\n"
+        
+        # Upload the test file
+        files = {
+            'file': ('test_german_logging.csv', csv_content, 'text/csv')
+        }
+        
+        response = requests.post(f"{BACKEND_URL}/upload", files=files)
+        
+        if response.status_code == 200:
+            job_id = response.json().get("job_id")
+            print(f"✅ Test job created: {job_id}")
+            return job_id
+        else:
+            print(f"❌ Failed to create test job. Status: {response.status_code}")
+            return None
+            
+    except Exception as e:
+        print(f"❌ Failed to create test job: {str(e)}")
         return None
 
 def run_all_tests():
