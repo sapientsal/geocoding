@@ -13,6 +13,7 @@ BACKEND_URL = "https://95a8d55d-d4d3-4544-aea7-981b1e115401.preview.emergentagen
 
 # Test results dictionary
 test_results = {
+    "Enhanced Geocoding System": {"status": "Not tested", "details": []},
     "Excel File Upload Processing": {"status": "Not tested", "details": []},
     "Address Geocoding with OpenStreetMap": {"status": "Not tested", "details": []},
     "Route Optimization Algorithm": {"status": "Not tested", "details": []},
