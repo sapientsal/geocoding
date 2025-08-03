@@ -836,6 +836,292 @@ def test_specific_street_sorting():
         log_test("Street-Based Sorting", f"Street-based sorting testing failed with error: {str(e)}", False)
         return None
 
+def test_manual_review_interface():
+    """Test the Manual Review Interface for failed addresses"""
+    print("\n🔍 Testing Manual Review Interface for Failed Addresses...")
+    print("=" * 80)
+    
+    try:
+        # First, create a test job with addresses that will have failures
+        print("📋 Creating test job with addresses that will have geocoding failures...")
+        
+        # Create test CSV with mix of valid and invalid addresses
+        test_addresses = [
+            ["Projektname Strasse", "Hausnummer", "Zusatz", "PLZ", "Ort"],
+            # Valid addresses (should succeed)
+            ["Worpswede Am Hörenberg", "8", "", "27726", "Worpswede"],
+            ["Worpswede Hembergerstraße", "29", "A", "27726", "Worpswede"],
+            # Invalid addresses (should fail)
+            ["", "12", "", "27726", "Worpswede"],  # Empty street
+            ["Worpswede Invalidstraße", "", "", "27726", "Worpswede"],  # Missing house number
+            ["Worpswede Teststraße", "999", "", "", ""],  # Missing PLZ and Ort
+            ["", "", "", "", ""],  # Completely empty
+            ["Worpswede Nonexistentstraße", "123", "", "99999", "Nonexistent"],  # Invalid location
+            # Problematic formats
+            ["Hauptstraße 1.0", "", "", "27726.0", "Worpswede"],  # Decimal formats
+            ["Invalid@Address#123", "5", "", "ABC", "Test"],  # Invalid characters
+        ]
+        
+        # Create CSV content
+        csv_content = ""
+        for row in test_addresses:
+            csv_content += ",".join([f'"{cell}"' for cell in row]) + "\n"
+        
+        # Upload the test file
+        files = {
+            'file': ('manual_review_test.csv', csv_content, 'text/csv')
+        }
+        
+        response = requests.post(f"{BACKEND_URL}/upload", files=files)
+        
+        if response.status_code != 200:
+            log_test("Manual Review Interface", f"Failed to upload test file. Status code: {response.status_code}", False)
+            return None
+        
+        job_id = response.json().get("job_id")
+        print(f"✅ Test job created: {job_id}")
+        
+        # Wait for job to complete
+        print("⏳ Waiting for job to complete...")
+        max_attempts = 30
+        polling_interval = 5
+        
+        for attempt in range(max_attempts):
+            print(f"Polling job status (attempt {attempt+1}/{max_attempts})...")
+            response = requests.get(f"{BACKEND_URL}/job/{job_id}")
+            
+            if response.status_code != 200:
+                log_test("Manual Review Interface", f"Failed to get job status. Status code: {response.status_code}", False)
+                return None
+            
+            job_data = response.json()
+            status = job_data.get("status")
+            
+            print(f"Current job status: {status}")
+            print(f"Processed: {job_data.get('processed_addresses')}/{job_data.get('total_addresses')}")
+            print(f"Geocoded: {job_data.get('geocoded_addresses')}")
+            
+            # Check if job is completed or failed
+            if status == "completed":
+                print(f"✅ Job completed successfully.")
+                break
+            elif status == "error":
+                log_test("Manual Review Interface", f"Job failed with error: {job_data.get('error_message')}", False)
+                return None
+            
+            # Wait before next polling attempt
+            time.sleep(polling_interval)
+        
+        # Now test the failed addresses API endpoint
+        print("\n🔍 Testing GET /api/job/{job_id}/failed-addresses endpoint...")
+        
+        response = requests.get(f"{BACKEND_URL}/job/{job_id}/failed-addresses")
+        
+        if response.status_code != 200:
+            log_test("Manual Review Interface", f"Failed to get failed addresses. Status code: {response.status_code}", False)
+            print(f"Response: {response.text}")
+            return None
+        
+        failed_data = response.json()
+        
+        # Verify response structure
+        required_fields = ['job_id', 'job_info', 'statistics', 'error_categories', 'failed_addresses', 'error_logs', 'detailed_breakdown']
+        missing_fields = [field for field in required_fields if field not in failed_data]
+        
+        if missing_fields:
+            log_test("Manual Review Interface", f"Response missing required fields: {missing_fields}", False)
+        else:
+            log_test("Manual Review Interface", "Failed addresses API returns all required fields")
+        
+        # Verify statistics
+        stats = failed_data.get('statistics', {})
+        total_addresses = stats.get('total_addresses', 0)
+        failed_count = stats.get('failed_geocoding', 0)
+        success_count = stats.get('successful_geocoding', 0)
+        failure_rate = stats.get('failure_rate', 0)
+        
+        print(f"📊 Statistics:")
+        print(f"  Total addresses: {total_addresses}")
+        print(f"  Successful geocoding: {success_count}")
+        print(f"  Failed geocoding: {failed_count}")
+        print(f"  Failure rate: {failure_rate}%")
+        
+        if total_addresses > 0 and failed_count > 0:
+            log_test("Manual Review Interface", f"Statistics correctly calculated: {failed_count}/{total_addresses} failed ({failure_rate}%)")
+        else:
+            log_test("Manual Review Interface", "No failed addresses found in test data", False)
+            return None
+        
+        # Verify error categorization
+        error_categories = failed_data.get('error_categories', {})
+        print(f"\n📊 Error Categories:")
+        for category, info in error_categories.items():
+            count = info.get('count', 0)
+            percentage = info.get('percentage', 0)
+            print(f"  {category}: {count} addresses ({percentage}%)")
+        
+        if error_categories:
+            log_test("Manual Review Interface", f"Error categorization working: {len(error_categories)} categories found")
+        else:
+            log_test("Manual Review Interface", "No error categories found", False)
+        
+        # Verify failed addresses details
+        failed_addresses = failed_data.get('failed_addresses', [])
+        print(f"\n📊 Failed Addresses Details:")
+        
+        if not failed_addresses:
+            log_test("Manual Review Interface", "No failed addresses in detailed list", False)
+        else:
+            log_test("Manual Review Interface", f"Retrieved {len(failed_addresses)} failed addresses with details")
+            
+            # Check structure of failed address entries
+            sample_failed = failed_addresses[0]
+            required_failed_fields = ['id', 'original_address', 'row_data', 'geocoding_error', 'address_components']
+            missing_failed_fields = [field for field in required_failed_fields if field not in sample_failed]
+            
+            if missing_failed_fields:
+                log_test("Manual Review Interface", f"Failed address entries missing fields: {missing_failed_fields}", False)
+            else:
+                log_test("Manual Review Interface", "Failed address entries contain all required fields")
+            
+            # Verify address components extraction
+            components = sample_failed.get('address_components', {})
+            component_fields = ['street', 'house_number', 'zusatz', 'postal_code', 'city']
+            
+            if all(field in components for field in component_fields):
+                log_test("Manual Review Interface", "Address components properly extracted and displayed")
+            else:
+                log_test("Manual Review Interface", "Address components missing some fields", False)
+            
+            # Print sample failed addresses
+            print(f"  Sample failed addresses:")
+            for i, failed in enumerate(failed_addresses[:5]):
+                original = failed.get('original_address', '')
+                error = failed.get('geocoding_error', '')
+                print(f"    {i+1}. '{original}' - Error: {error}")
+        
+        # Verify error logs
+        error_logs = failed_data.get('error_logs', [])
+        if error_logs:
+            log_test("Manual Review Interface", f"Error logs retrieved: {len(error_logs)} entries")
+            print(f"  Sample error logs:")
+            for i, log in enumerate(error_logs[:3]):
+                level = log.get('level', '')
+                message = log.get('message', '')
+                address = log.get('address', '')
+                print(f"    {i+1}. [{level}] {message} - Address: {address}")
+        else:
+            print("  No error logs found (may be expected for new jobs)")
+        
+        # Test the export functionality
+        print("\n🔍 Testing GET /api/job/{job_id}/failed-addresses/export endpoint...")
+        
+        response = requests.get(f"{BACKEND_URL}/job/{job_id}/failed-addresses/export")
+        
+        if response.status_code != 200:
+            log_test("Manual Review Interface", f"Failed to export failed addresses. Status code: {response.status_code}", False)
+            print(f"Response: {response.text}")
+        else:
+            # Verify Excel export headers
+            content_type = response.headers.get('Content-Type')
+            content_disposition = response.headers.get('Content-Disposition')
+            
+            expected_content_type = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            
+            if content_type == expected_content_type and 'attachment' in content_disposition:
+                log_test("Manual Review Interface", "Excel export generates proper file with correct headers")
+                
+                # Verify filename format
+                if 'failed_addresses_analysis_' in content_disposition:
+                    log_test("Manual Review Interface", "Excel export filename follows expected format")
+                else:
+                    log_test("Manual Review Interface", "Excel export filename format incorrect", False)
+                
+                # Verify file size (should be substantial for Excel with multiple sheets)
+                content_length = len(response.content)
+                if content_length > 1000:  # At least 1KB for a proper Excel file
+                    log_test("Manual Review Interface", f"Excel export file size appropriate: {content_length} bytes")
+                else:
+                    log_test("Manual Review Interface", f"Excel export file size too small: {content_length} bytes", False)
+                    
+            else:
+                log_test("Manual Review Interface", f"Excel export has incorrect headers. Content-Type: {content_type}, Content-Disposition: {content_disposition}", False)
+        
+        # Verify that failure counts match job statistics
+        print("\n🔍 Verifying failure counts match job statistics...")
+        
+        job_response = requests.get(f"{BACKEND_URL}/job/{job_id}")
+        if job_response.status_code == 200:
+            job_stats = job_response.json()
+            job_total = job_stats.get('total_addresses', 0)
+            job_geocoded = job_stats.get('geocoded_addresses', 0)
+            job_failed = job_total - job_geocoded
+            
+            api_failed = failed_data.get('statistics', {}).get('failed_geocoding', 0)
+            
+            if job_failed == api_failed:
+                log_test("Manual Review Interface", f"Failure counts match between job stats ({job_failed}) and failed addresses API ({api_failed})")
+            else:
+                log_test("Manual Review Interface", f"Failure counts mismatch: job stats ({job_failed}) vs failed addresses API ({api_failed})", False)
+        
+        # Test with a job that has no failures (if possible)
+        print("\n🔍 Testing with job that has no failures...")
+        
+        # Create a simple job with only valid addresses
+        valid_addresses = [
+            ["Address"],
+            ["1600 Pennsylvania Avenue NW, Washington, DC 20500"],  # White House
+            ["350 Fifth Avenue, New York, NY 10118"],               # Empire State Building
+        ]
+        
+        valid_csv = ""
+        for row in valid_addresses:
+            valid_csv += ",".join(row) + "\n"
+        
+        files = {
+            'file': ('valid_addresses_test.csv', valid_csv, 'text/csv')
+        }
+        
+        response = requests.post(f"{BACKEND_URL}/upload", files=files)
+        
+        if response.status_code == 200:
+            valid_job_id = response.json().get("job_id")
+            
+            # Wait for completion
+            for attempt in range(20):
+                response = requests.get(f"{BACKEND_URL}/job/{valid_job_id}")
+                if response.status_code == 200:
+                    job_data = response.json()
+                    if job_data.get("status") == "completed":
+                        break
+                time.sleep(3)
+            
+            # Test failed addresses endpoint with job that has no failures
+            response = requests.get(f"{BACKEND_URL}/job/{valid_job_id}/failed-addresses")
+            
+            if response.status_code == 200:
+                no_fail_data = response.json()
+                no_fail_count = no_fail_data.get('statistics', {}).get('failed_geocoding', 0)
+                
+                if no_fail_count == 0:
+                    log_test("Manual Review Interface", "API correctly handles jobs with no failed addresses")
+                else:
+                    log_test("Manual Review Interface", f"API incorrectly reports {no_fail_count} failures for valid addresses job", False)
+            
+            # Clean up
+            requests.delete(f"{BACKEND_URL}/job/{valid_job_id}")
+        
+        # Clean up main test job
+        requests.delete(f"{BACKEND_URL}/job/{job_id}")
+        
+        return job_id
+        
+    except Exception as e:
+        log_test("Manual Review Interface", f"Manual review interface testing failed with error: {str(e)}", False)
+        import traceback
+        traceback.print_exc()
+        return None
+
 def investigate_helmstedt_geocoding_failures():
     """Investigate the Helmstedt geocoding failure issue"""
     print("\n🔍 Investigating Helmstedt Geocoding Failures...")
