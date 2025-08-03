@@ -775,25 +775,51 @@ def validate_and_clean_german_address(address: str) -> dict:
             'error': f'Validation error: {str(e)}'
         }
 
-async def geocode_address_with_cache(address: str) -> dict:
+async def geocode_address_with_cache(address: str, job_logger: JobLogger = None) -> dict:
     """
     Ultra-robust geocoding with comprehensive monitoring and error handling
     """
     try:
         # Check cache first
         if address in address_cache:
-            return address_cache[address]
+            cached_result = address_cache[address]
+            if job_logger and not cached_result.get('geocoded', False):
+                job_logger.log('INFO', f'Address retrieved from cache (failed): {cached_result.get("error", "Unknown error")}', address=address)
+            return cached_result
         
-        # Clean and prepare the address
+        # Enhanced address cleaning and validation for German addresses
         address_clean = address.strip()
         if not address_clean:
-            return {
+            error_result = {
                 'latitude': None,
                 'longitude': None,
                 'formatted_address': address,
                 'geocoded': False,
                 'error': 'Empty address'
             }
+            if job_logger:
+                job_logger.log('WARNING', 'Empty address provided for geocoding', address=address)
+            return error_result
+        
+        # Pre-validate and clean German address format
+        validation_result = validate_and_clean_german_address(address_clean)
+        if not validation_result['is_valid']:
+            error_result = {
+                'latitude': None,
+                'longitude': None,
+                'formatted_address': address,
+                'geocoded': False,
+                'error': f'Invalid address format: {validation_result["error"]}'
+            }
+            if job_logger:
+                job_logger.log('WARNING', f'Invalid address format: {validation_result["error"]}', address=address)
+            address_cache[address] = error_result
+            return error_result
+        
+        # Use the cleaned address for geocoding
+        address_clean = validation_result['cleaned_address']
+        if job_logger:
+            job_logger.log('INFO', f'Address cleaned and validated successfully', address=f'{address} -> {address_clean}')
         
         # Enhanced retry logic with comprehensive error handling
         max_retries = 7  # Increased retries
