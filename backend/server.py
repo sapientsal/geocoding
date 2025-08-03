@@ -3120,15 +3120,15 @@ async def get_failed_addresses(job_id: str):
                 failed_info = {
                     'id': address.get('id'),
                     'original_address': address.get('original_address', ''),
-                    'row_data': address.get('row_data', {}),
+                    'row_data': address.get('original_row_data', {}),
                     'geocoding_error': address.get('geocoding_error', 'Unknown error'),
                     'formatted_address': address.get('formatted_address', ''),
                     'address_components': {
-                        'street': address.get('row_data', {}).get('Projektname Strasse', ''),
-                        'house_number': address.get('row_data', {}).get('Hausnummer', ''),
-                        'zusatz': address.get('row_data', {}).get('Zusatz', ''),
-                        'postal_code': address.get('row_data', {}).get('PLZ', ''),
-                        'city': address.get('row_data', {}).get('Ort', '')
+                        'street': address.get('original_row_data', {}).get('Projektname Strasse', ''),
+                        'house_number': address.get('original_row_data', {}).get('Hausnummer', ''),
+                        'zusatz': address.get('original_row_data', {}).get('Zusatz', ''),
+                        'postal_code': address.get('original_row_data', {}).get('PLZ', ''),
+                        'city': address.get('original_row_data', {}).get('Ort', '')
                     }
                 }
                 failed_addresses.append(failed_info)
