@@ -119,6 +119,9 @@ function App() {
   const [routeDistances, setRouteDistances] = useState([]);
   const [jobLogs, setJobLogs] = useState([]);
   const [showLogs, setShowLogs] = useState(false);
+  const [failedAddresses, setFailedAddresses] = useState(null);
+  const [showFailedAddresses, setShowFailedAddresses] = useState(false);
+  const [selectedErrorCategory, setSelectedErrorCategory] = useState('all');
   const mapRef = useRef(null);
 
   // Fetch jobs on component mount
