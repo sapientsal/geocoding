@@ -2286,6 +2286,9 @@ async def process_geographic_optimization_job(job_id: str, file_content: bytes, 
             }}
         )
         
+        # Create job logger for monitoring
+        job_logger = JobLogger(job_id)
+        
         # Geocode all addresses with enhanced batch processing
         geocoded_data = []
         geocoded_count = 0
@@ -2303,7 +2306,7 @@ async def process_geographic_optimization_job(job_id: str, file_content: bytes, 
                 
                 try:
                     print(f"Geocoding address {i+1}/{total_addresses}: {address}")
-                    geocoded = await geocode_address_with_cache(address)
+                    geocoded = await geocode_address_with_cache(address, job_logger)
                     geocoded_data.append(geocoded)
                     
                     if geocoded.get('latitude') and geocoded.get('longitude'):
