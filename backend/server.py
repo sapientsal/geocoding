@@ -464,6 +464,8 @@ def optimize_geographic_route(df, geocoded_data, addresses_to_geocode):
             working_df.loc[i, 'latitude'] = geocoded.get('latitude')
             working_df.loc[i, 'longitude'] = geocoded.get('longitude')
             working_df.loc[i, 'formatted_address'] = geocoded.get('formatted_address', '')
+            working_df.loc[i, 'geocoded'] = geocoded.get('geocoded', False)
+            working_df.loc[i, 'geocoding_error'] = geocoded.get('error', '')
     
     # Detect street and house number columns for proper sorting
     street_col = house_num_col = None
