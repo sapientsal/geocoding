@@ -1123,6 +1123,147 @@ def test_manual_review_interface():
         traceback.print_exc()
         return None
 
+def test_helmstedt_failed_addresses_bug():
+    """Test the specific Helmstedt job failed addresses bug"""
+    print("\n🔍 Testing Helmstedt Failed Addresses Bug...")
+    print("=" * 80)
+    
+    # The specific job ID mentioned in the bug report
+    helmstedt_job_id = "dce58109-88ee-459c-b68d-baea39a64f76"
+    
+    try:
+        print(f"🎯 Testing specific Helmstedt job: {helmstedt_job_id}")
+        
+        # First, test the job status endpoint
+        print("📋 Step 1: Getting job status...")
+        response = requests.get(f"{BACKEND_URL}/job/{helmstedt_job_id}")
+        
+        if response.status_code != 200:
+            log_test("Manual Review Interface", f"Failed to get Helmstedt job status. Status code: {response.status_code}", False)
+            print(f"Response: {response.text}")
+            return None
+        
+        job_data = response.json()
+        total_addresses = job_data.get("total_addresses", 0)
+        geocoded_addresses = job_data.get("geocoded_addresses", 0)
+        expected_failed = total_addresses - geocoded_addresses
+        
+        print(f"📊 Job Statistics:")
+        print(f"  Total addresses: {total_addresses}")
+        print(f"  Geocoded addresses: {geocoded_addresses}")
+        print(f"  Expected failed addresses: {expected_failed}")
+        print(f"  Job status: {job_data.get('status')}")
+        print(f"  Filename: {job_data.get('filename')}")
+        
+        # Now test the failed-addresses endpoint
+        print("\n📋 Step 2: Testing /api/job/{job_id}/failed-addresses endpoint...")
+        response = requests.get(f"{BACKEND_URL}/job/{helmstedt_job_id}/failed-addresses")
+        
+        if response.status_code != 200:
+            log_test("Manual Review Interface", f"CRITICAL BUG: Failed addresses endpoint returned status {response.status_code}", False)
+            print(f"Response: {response.text}")
+            
+            # Try to debug the issue by checking if the endpoint exists
+            print("\n🔍 Debugging: Checking if endpoint exists...")
+            try:
+                # Check if it's a 404 (endpoint not found) or other error
+                if response.status_code == 404:
+                    print("❌ Endpoint not found - the failed-addresses endpoint may not be implemented")
+                elif response.status_code == 500:
+                    print("❌ Server error - there's likely a bug in the endpoint implementation")
+                    print("Response text:", response.text)
+                else:
+                    print(f"❌ Unexpected error code: {response.status_code}")
+            except Exception as e:
+                print(f"Error during debugging: {e}")
+            
+            return None
+        
+        failed_data = response.json()
+        
+        # Check the response structure
+        print(f"📊 Failed Addresses API Response Structure:")
+        for key in failed_data.keys():
+            print(f"  - {key}: {type(failed_data[key])}")
+        
+        # Get the actual failed count from the API
+        api_failed_count = 0
+        if 'statistics' in failed_data:
+            api_failed_count = failed_data['statistics'].get('failed_geocoding', 0)
+        elif 'failed_addresses' in failed_data:
+            api_failed_count = len(failed_data['failed_addresses'])
+        
+        print(f"\n📊 Comparison:")
+        print(f"  Expected failed addresses (from job stats): {expected_failed}")
+        print(f"  Actual failed addresses (from API): {api_failed_count}")
+        
+        # This is the critical bug check
+        if expected_failed > 0 and api_failed_count == 0:
+            log_test("Manual Review Interface", f"CRITICAL BUG CONFIRMED: Expected {expected_failed} failed addresses but API returned {api_failed_count}", False)
+            
+            # Debug further - check the database directly by looking at addresses
+            print("\n🔍 Step 3: Debugging database query...")
+            
+            # Try to get all addresses for this job to see the actual data
+            addresses_response = requests.get(f"{BACKEND_URL}/route/{helmstedt_job_id}")
+            if addresses_response.status_code == 200:
+                route_data = addresses_response.json()
+                addresses = route_data.get("addresses", [])
+                
+                print(f"📊 Route data analysis:")
+                print(f"  Total addresses in route: {len(addresses)}")
+                
+                # Count geocoded vs failed manually
+                manual_geocoded = 0
+                manual_failed = 0
+                failed_examples = []
+                
+                for addr in addresses:
+                    if addr.get("geocoded", False):
+                        manual_geocoded += 1
+                    else:
+                        manual_failed += 1
+                        if len(failed_examples) < 5:
+                            failed_examples.append({
+                                "original": addr.get("original_address", ""),
+                                "error": addr.get("geocoding_error", "")
+                            })
+                
+                print(f"  Manual count - Geocoded: {manual_geocoded}, Failed: {manual_failed}")
+                
+                if manual_failed > 0:
+                    print(f"  Sample failed addresses:")
+                    for i, example in enumerate(failed_examples):
+                        print(f"    {i+1}. '{example['original']}' - Error: {example['error']}")
+                    
+                    log_test("Manual Review Interface", f"DATABASE ISSUE: Manual count shows {manual_failed} failed addresses, but API returns 0. The filtering logic in get_failed_addresses is broken.", False)
+                else:
+                    log_test("Manual Review Interface", f"DATA INCONSISTENCY: Job stats show {expected_failed} failed but manual count shows {manual_failed} failed", False)
+            else:
+                print(f"❌ Could not get route data for debugging. Status: {addresses_response.status_code}")
+                
+        elif expected_failed == api_failed_count:
+            log_test("Manual Review Interface", f"Failed addresses count matches: {api_failed_count}")
+        else:
+            log_test("Manual Review Interface", f"Failed addresses count mismatch: expected {expected_failed}, got {api_failed_count}", False)
+        
+        # Test the data structure if we got results
+        if api_failed_count > 0:
+            failed_addresses = failed_data.get('failed_addresses', [])
+            if failed_addresses:
+                sample_failed = failed_addresses[0]
+                print(f"\n📊 Sample failed address structure:")
+                for key, value in sample_failed.items():
+                    print(f"  {key}: {type(value)} = {str(value)[:100]}")
+        
+        return helmstedt_job_id
+        
+    except Exception as e:
+        log_test("Manual Review Interface", f"Helmstedt bug testing failed with error: {str(e)}", False)
+        import traceback
+        traceback.print_exc()
+        return None
+
 def investigate_helmstedt_geocoding_failures():
     """Investigate the Helmstedt geocoding failure issue"""
     print("\n🔍 Investigating Helmstedt Geocoding Failures...")
