@@ -3314,40 +3314,35 @@ async def get_route(job_id: str):
     if job["status"] != "completed":
         raise HTTPException(status_code=400, detail="Job is not completed yet")
     
-    # Get route
+    # Get route from routes collection
     route = routes_collection.find_one({"job_id": job_id})
     if not route:
         raise HTTPException(status_code=404, detail="Route not found")
     
-    # Get addresses
-    addresses = list(addresses_collection.find({"job_id": job_id}))
+    # Use optimized addresses from route data (new structure)
+    optimized_addresses = route.get("optimized_addresses", [])
     
-    # Convert to proper format
+    # Convert to proper format for API response
     address_objects = []
-    for addr in addresses:
+    for addr in optimized_addresses:
         address_objects.append({
-            "id": addr["id"],
-            "original_address": addr["original_address"],
+            "id": addr.get("id"),
+            "original_address": addr.get("original_address", ""),
             "formatted_address": addr.get("formatted_address"),
             "latitude": addr.get("latitude"),
             "longitude": addr.get("longitude"),
             "geocoded": addr.get("geocoded", False),
-            "geocoding_error": addr.get("geocoding_error")
+            "geocoding_error": addr.get("geocoding_error", addr.get("error")),
+            "distance_to_next": addr.get("distance_to_next")
         })
     
-    # Create ordered addresses based on optimized route
-    optimized_addresses = []
-    for index in route["optimized_order"]:
-        if index < len(address_objects):
-            optimized_addresses.append(address_objects[index])
-    
     return {
-        "id": route["id"],
+        "id": route.get("_id"),
         "job_id": job_id,
         "addresses": address_objects,
-        "optimized_addresses": optimized_addresses,
-        "total_distance": route["total_distance"],
-        "created_at": route["created_at"].isoformat()
+        "optimized_addresses": address_objects,  # Same as addresses since they're already optimized
+        "total_distance": route.get("total_distance", 0),
+        "created_at": route.get("created_at").isoformat() if route.get("created_at") else None
     }
 
 @app.get("/api/jobs")
