@@ -1051,11 +1051,11 @@ def investigate_helmstedt_geocoding_failures():
         
         # Get actual addresses from the job to analyze the data
         print(f"\n📋 Fetching job addresses for data analysis...")
-        addresses_response = requests.get(f"{BACKEND_URL}/job/{job_id}/addresses")
+        route_response = requests.get(f"{BACKEND_URL}/route/{job_id}")
         
-        if addresses_response.status_code == 200:
-            addresses_data = addresses_response.json()
-            addresses = addresses_data.get("addresses", [])
+        if route_response.status_code == 200:
+            route_data = route_response.json()
+            addresses = route_data.get("addresses", [])
             
             print(f"📊 Retrieved {len(addresses)} addresses from job")
             
@@ -1089,7 +1089,16 @@ def investigate_helmstedt_geocoding_failures():
                     if len(addresses) > 3:
                         print(f"     ... and {len(addresses) - 3} more")
         else:
-            print(f"❌ Failed to get job addresses. Status code: {addresses_response.status_code}")
+            print(f"❌ Failed to get job route data. Status code: {route_response.status_code}")
+            print(f"Response: {route_response.text}")
+            
+            # If route endpoint fails, try to get job details at least
+            job_response = requests.get(f"{BACKEND_URL}/job/{job_id}")
+            if job_response.status_code == 200:
+                job_data = job_response.json()
+                print(f"📊 Job details: {job_data}")
+            else:
+                print(f"❌ Failed to get job details. Status code: {job_response.status_code}")
         
         # Summary and recommendations
         print(f"\n📋 INVESTIGATION SUMMARY:")
