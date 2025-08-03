@@ -902,20 +902,29 @@ async def geocode_address_with_cache(address: str, job_logger: JobLogger = None)
                         elif response.status == 429:
                             # Rate limited - use exponential backoff
                             delay = base_delay * (4 ** attempt)
+                            if job_logger:
+                                job_logger.log('WARNING', f'Rate limited (429), waiting {delay:.1f}s before retry {attempt + 1}', address=address_clean)
                             await asyncio.sleep(min(delay, 60))  # Cap at 60 seconds
                             continue
                         
                         elif response.status >= 500:
                             # Server error - retry with backoff
                             delay = base_delay * (2 ** attempt)
+                            if job_logger:
+                                job_logger.log('WARNING', f'Server error {response.status}, waiting {delay:.1f}s before retry {attempt + 1}', address=address_clean)
                             await asyncio.sleep(min(delay, 30))
                             continue
                         
                         else:
                             if attempt == max_retries - 1:
-                                raise Exception(f"HTTP {response.status} error after all retries")
+                                error_msg = f"HTTP {response.status} error after all retries"
+                                if job_logger:
+                                    job_logger.log('CRITICAL', error_msg, address=address_clean)
+                                raise Exception(error_msg)
                             
                             delay = base_delay * (2 ** attempt)
+                            if job_logger:
+                                job_logger.log('WARNING', f'HTTP {response.status} error, waiting {delay:.1f}s before retry {attempt + 1}', address=address_clean)
                             await asyncio.sleep(min(delay, 20))
                             continue
                             
