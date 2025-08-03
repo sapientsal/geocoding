@@ -2122,7 +2122,7 @@ async def robust_geocode_with_monitoring(address: str, logger: JobLogger, addres
             return address_cache[address]
         
         # Use the existing geocoding function but with monitoring
-        result = await geocode_address_with_cache(address)
+        result = await geocode_address_with_cache(address, logger)
         
         if result.get('geocoded'):
             logger.log("INFO", f"Successfully geocoded", address_index, address)
