@@ -972,11 +972,15 @@ async def geocode_address_with_cache(address: str, job_logger: JobLogger = None)
             'geocoded': False,
             'error': f'Failed after {max_retries} attempts - service unavailable'
         }
+        if job_logger:
+            job_logger.log('CRITICAL', f'All geocoding attempts failed for address', address=address_clean)
         address_cache[address] = empty_result
         return empty_result
         
     except Exception as e:
         error_msg = f"Critical geocoding error: {str(e)[:200]}"
+        if job_logger:
+            job_logger.log('CRITICAL', f'Critical geocoding error: {str(e)[:200]}', address=address)
         return {
             'latitude': None,
             'longitude': None,
