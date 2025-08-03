@@ -849,8 +849,7 @@ def investigate_helmstedt_geocoding_failures():
             print(f"❌ Failed to get jobs list. Status code: {response.status_code}")
             return None
         
-        jobs_data = response.json()
-        jobs = jobs_data.get("jobs", [])
+        jobs = response.json()  # This is directly a list, not a dict with "jobs" key
         
         print(f"📊 Found {len(jobs)} total jobs in the system")
         
