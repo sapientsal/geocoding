@@ -1808,6 +1808,12 @@ def run_all_tests():
     # Skip health check as it's not implemented
     print("\n🔍 Skipping health check endpoint (not implemented)")
     
+    # PRIORITY: Test Manual Review Interface for Failed Addresses
+    print("\n" + "=" * 80)
+    print("🔍 Testing Manual Review Interface for Failed Addresses")
+    print("=" * 80)
+    manual_review_job_id = test_manual_review_interface()
+    
     # PRIORITY: Test Enhanced Geocoding System with German Address Validation
     print("\n" + "=" * 80)
     print("🇩🇪 Testing Enhanced Geocoding System with German Address Validation")
