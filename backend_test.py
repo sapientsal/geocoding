@@ -880,6 +880,12 @@ def test_manual_review_interface():
             ["Test", "1", "", "1", "X"],  # Minimal invalid data
         ]
         
+        print(f"📊 Test data created:")
+        print(f"  - Total addresses: {len(test_addresses) - 1}")  # -1 for header
+        print(f"  - Expected valid addresses: ~5")
+        print(f"  - Expected failed addresses: ~14")
+        print(f"  - This should demonstrate the fix works for new jobs")
+        
         # Create CSV content
         csv_content = ""
         for row in test_addresses:
