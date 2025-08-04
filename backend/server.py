@@ -638,9 +638,10 @@ def optimize_geographic_route(df, geocoded_data, addresses_to_geocode):
         invalid_addresses = working_df[working_df['latitude'].isna() | working_df['longitude'].isna()].copy()
         
         if len(valid_addresses) == 0:
+            # All addresses failed geocoding
             optimized_df = working_df
         else:
-            # Simple nearest neighbor optimization
+            # Simple nearest neighbor optimization for valid addresses
             route_order = []
             remaining_indices = list(valid_addresses.index)
             current_index = remaining_indices[0]
@@ -670,7 +671,9 @@ def optimize_geographic_route(df, geocoded_data, addresses_to_geocode):
             
             optimized_valid = valid_addresses.loc[route_order].copy()
             
+            # Always include invalid addresses at the end
             if len(invalid_addresses) > 0:
+                print(f"Adding {len(invalid_addresses)} failed addresses at the end of the route")
                 optimized_df = pd.concat([optimized_valid, invalid_addresses], ignore_index=True)
             else:
                 optimized_df = optimized_valid
