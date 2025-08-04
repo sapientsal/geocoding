@@ -312,6 +312,21 @@ backend:
         agent: "testing"
         comment: "Verified that the backend includes several performance optimizations for handling large datasets: 1) Batch processing with configurable batch size, 2) Caching to avoid redundant API calls, 3) Retry logic with exponential backoff (max_retries=7), 4) Comprehensive error handling, 5) Rate limiting to comply with API requirements, and 6) Detailed logging through the JobLogger system. These optimizations help ensure that the system can handle large datasets efficiently and reliably. Testing with a dataset of 50 addresses showed good performance, with the entire processing completing in under a minute despite the rate limiting requirements of the OpenStreetMap API."
 
+  - task: "Manual Review Interface for Failed Addresses"
+    implemented: true
+    working: false
+    file: "server.py"
+    stuck_count: 1
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Manual Review Interface implemented for failed address analysis with /api/job/{job_id}/failed-addresses endpoint"
+      - working: false
+        agent: "testing"
+        comment: "CRITICAL BUG IDENTIFIED AND FIXED: The Manual Review Interface was showing 0 failed addresses instead of the expected ~140 failed addresses for the Helmstedt job (ID: dce58109-88ee-459c-b68d-baea39a64f76). Root cause analysis revealed that failed addresses were being filtered out during the route optimization process and not stored in the database. The issue was in two parts: 1) Streets with only failed addresses were completely excluded from optimization in optimize_geographic_route(), and 2) The geocoded boolean logic incorrectly treated NaN coordinates as successfully geocoded (bool(NaN) = True). FIXED: Modified optimize_geographic_route() to preserve failed addresses by tracking streets_without_coords and adding them at the end, and corrected the geocoded boolean logic to properly handle NaN values using pd.isna() checks. The fix has been tested and confirmed working for new jobs, but existing jobs like Helmstedt still show the old incorrect data structure."
+
 frontend:
   - task: "File Upload Interface"
     implemented: true
