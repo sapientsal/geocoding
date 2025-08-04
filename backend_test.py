@@ -838,29 +838,46 @@ def test_specific_street_sorting():
         return None
 
 def test_manual_review_interface():
-    """Test the Manual Review Interface for failed addresses"""
+    """Test the Manual Review Interface for failed addresses - COMPREHENSIVE TEST"""
     print("\n🔍 Testing Manual Review Interface for Failed Addresses...")
     print("=" * 80)
+    print("🎯 GOAL: Prove that the failed addresses bug has been fixed by creating a new job")
+    print("    with intentionally problematic addresses and testing the API endpoint.")
     
     try:
         # First, create a test job with addresses that will have failures
-        print("📋 Creating test job with addresses that will have geocoding failures...")
+        print("📋 Creating test job with mix of valid and invalid German addresses...")
         
-        # Create test CSV with mix of valid and invalid addresses
+        # Create test CSV with mix of valid and invalid addresses - designed to test the fix
         test_addresses = [
             ["Projektname Strasse", "Hausnummer", "Zusatz", "PLZ", "Ort"],
-            # Valid addresses (should succeed)
+            
+            # VALID ADDRESSES (should succeed) - for comparison
             ["Worpswede Am Hörenberg", "8", "", "27726", "Worpswede"],
             ["Worpswede Hembergerstraße", "29", "A", "27726", "Worpswede"],
-            # Invalid addresses (should fail)
-            ["", "12", "", "27726", "Worpswede"],  # Empty street
+            ["Worpswede Bergstraße", "10", "", "27726", "Worpswede"],
+            ["Berlin Unter den Linden", "1", "", "10117", "Berlin"],
+            ["München Marienplatz", "8", "", "80331", "München"],
+            
+            # INVALID ADDRESSES (should definitely fail geocoding)
+            ["", "12", "", "27726", "Worpswede"],  # Empty street name
             ["Worpswede Invalidstraße", "", "", "27726", "Worpswede"],  # Missing house number
             ["Worpswede Teststraße", "999", "", "", ""],  # Missing PLZ and Ort
-            ["", "", "", "", ""],  # Completely empty
+            ["", "", "", "", ""],  # Completely empty address
             ["Worpswede Nonexistentstraße", "123", "", "99999", "Nonexistent"],  # Invalid location
-            # Problematic formats
+            ["Worpswede Fakestraße", "456", "", "00000", "Fakecity"],  # Another invalid location
+            
+            # MALFORMED ADDRESSES (should fail)
             ["Hauptstraße 1.0", "", "", "27726.0", "Worpswede"],  # Decimal formats
             ["Invalid@Address#123", "5", "", "ABC", "Test"],  # Invalid characters
+            ["123456789012345678901234567890", "999", "", "12345", "Toolongstreetname"],  # Too long
+            ["Worpswede ÄÖÜßstraße", "1", "", "27726", "Worpswede"],  # Special characters (might work)
+            
+            # EDGE CASES (likely to fail)
+            ["Worpswede ", "", "", "27726", "Worpswede"],  # Just prefix, no street
+            ["624 Worpswede", "", "", "27726", "Worpswede"],  # Just project code
+            ["Worpswede Straße ohne Nummer", "", "", "27726", "Worpswede"],  # No house number
+            ["Test", "1", "", "1", "X"],  # Minimal invalid data
         ]
         
         # Create CSV content
