@@ -559,6 +559,7 @@ def optimize_geographic_route(df, geocoded_data, addresses_to_geocode):
         # Group by street and get the center coordinates for each street
         street_groups = []
         street_centers = {}
+        streets_without_coords = []  # Track streets with no valid coordinates
         
         for street_name in working_df_sorted['street_clean'].unique():
             if street_name == '':
@@ -573,6 +574,10 @@ def optimize_geographic_route(df, geocoded_data, addresses_to_geocode):
                 center_lon = valid_coords['longitude'].mean()
                 street_centers[street_name] = (center_lat, center_lon)
                 street_groups.append((street_name, street_addresses))
+            else:
+                # Keep track of streets with no valid coordinates (failed addresses only)
+                streets_without_coords.append((street_name, street_addresses))
+                print(f"Warning: Street '{street_name}' has no valid coordinates, will be added at the end")
         
         # Sort street groups by geographic proximity
         if len(street_groups) > 1:
