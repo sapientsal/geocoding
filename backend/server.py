@@ -2423,13 +2423,20 @@ async def process_geographic_optimization_job(job_id: str, file_content: bytes, 
                 else:
                     row_dict[k] = v
             
+            # Determine if address was successfully geocoded
+            lat = row.get('latitude')
+            lon = row.get('longitude')
+            is_geocoded = (lat is not None and lon is not None and 
+                          not pd.isna(lat) and not pd.isna(lon) and
+                          lat != 0 and lon != 0)
+            
             address_data = {
                 "id": str(uuid.uuid4()),
                 "original_address": row.get('original_address', ''),
-                "latitude": row.get('latitude'),
-                "longitude": row.get('longitude'),
+                "latitude": None if pd.isna(lat) else lat,
+                "longitude": None if pd.isna(lon) else lon,
                 "formatted_address": row.get('formatted_address', ''),
-                "geocoded": bool(row.get('latitude') and row.get('longitude')),
+                "geocoded": is_geocoded,
                 "geocoding_error": row.get('geocoding_error', ''),
                 "distance_to_next": None if pd.isna(row.get('distance_to_next_m')) else row.get('distance_to_next_m'),
                 "row_data": row_dict
