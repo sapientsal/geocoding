@@ -614,9 +614,22 @@ def optimize_geographic_route(df, geocoded_data, addresses_to_geocode):
             for street_name, street_addresses in optimized_street_order:
                 optimized_parts.append(street_addresses)
             
+            # Add streets with no valid coordinates at the end
+            for street_name, street_addresses in streets_without_coords:
+                optimized_parts.append(street_addresses)
+                print(f"Added street '{street_name}' with failed addresses at the end")
+            
             optimized_df = pd.concat(optimized_parts, ignore_index=True) if optimized_parts else working_df_sorted
         else:
-            optimized_df = working_df_sorted
+            # If only one street group, still need to add streets without coordinates
+            if streets_without_coords:
+                all_parts = [working_df_sorted]
+                for street_name, street_addresses in streets_without_coords:
+                    all_parts.append(street_addresses)
+                    print(f"Added street '{street_name}' with failed addresses")
+                optimized_df = pd.concat(all_parts, ignore_index=True)
+            else:
+                optimized_df = working_df_sorted
             
     else:
         # Fallback to basic geographic optimization if no street columns detected
