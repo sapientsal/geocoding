@@ -2430,6 +2430,7 @@ async def process_geographic_optimization_job(job_id: str, file_content: bytes, 
                 "longitude": row.get('longitude'),
                 "formatted_address": row.get('formatted_address', ''),
                 "geocoded": bool(row.get('latitude') and row.get('longitude')),
+                "geocoding_error": row.get('geocoding_error', ''),
                 "distance_to_next": None if pd.isna(row.get('distance_to_next_m')) else row.get('distance_to_next_m'),
                 "row_data": row_dict
             }
