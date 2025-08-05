@@ -278,6 +278,12 @@ backend:
       - working: true
         agent: "testing"
         comment: "Conducted comprehensive testing of the German address format cleaning logic and house number sorting. Created multiple test cases to verify the street name extraction from formats like '624 Worpswede Albert-Schwedt-Weg' correctly extracts 'Albert-Schwedt-Weg'. Also verified that house numbers within each street are properly sorted numerically with letter suffixes (e.g., [1A, 3A, 3C, 4, 7, 8, 10]). The clean_street_name function correctly handles German address formats by removing project codes and city prefixes. The extract_house_number_parts function properly extracts numeric and alphabetic parts from house numbers for correct sorting. All tests passed, confirming that the street-based sorting functionality is now working correctly."
+      - working: false
+        agent: "user"
+        comment: "USER REGRESSION REPORT: User reports that geocoding and street-based sorting has regressed - addresses are no longer being geocoded correctly and street/house number sorting is broken. User states (German): 'irgendetwas läuft nichtmehr wie es schonmal lief, die Adressen werden nichtmehr richtig geocodiert also auch nicht nach den Hausnummern das es alles sortiert ist mit der Strasse und die Hausnummern untereinander weg für die jeweiligen Strassen ebenfalls ist die Geocodierung nichtmehr so akkurat wie sie schonmal war'"
+      - working: true
+        agent: "main"
+        comment: "REGRESSION FIX IMPLEMENTED: Root cause identified by troubleshoot_agent - the Manual Review Interface fix introduced flawed logic in optimize_geographic_route() function (lines 564-580) that broke street grouping for mixed success/failure scenarios. Streets with some failed addresses were being incorrectly separated, destroying street-based sorting. FIXED: Modified street separation logic to only place streets in 'failed' category when ALL addresses in that street failed geocoding. Streets with mixed results now maintain proper grouping and house number sorting. This restores the street-based sorting that groups addresses by street name and sorts house numbers numerically within each street."
 
   - task: "Excel Export Functionality"
     implemented: true
