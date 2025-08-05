@@ -2285,6 +2285,12 @@ def run_all_tests():
     # Skip health check as it's not implemented
     print("\n🔍 Skipping health check endpoint (not implemented)")
     
+    # CRITICAL PRIORITY: Test Column Detection Fix for House Number Identification
+    print("\n" + "=" * 80)
+    print("🚨 CRITICAL: Testing Column Detection Fix for House Number Identification")
+    print("=" * 80)
+    column_detection_job_id = test_column_detection_fix()
+    
     # PRIORITY: Test Manual Review Interface for Failed Addresses
     print("\n" + "=" * 80)
     print("🔍 Testing Manual Review Interface for Failed Addresses")
