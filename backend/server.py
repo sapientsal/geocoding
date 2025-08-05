@@ -1785,7 +1785,7 @@ async def process_street_sorted_job(job_id: str, file_content: bytes, filename: 
             col_lower = col.lower().strip()
             if any(keyword in col_lower for keyword in ['projektname strasse', 'strasse', 'straße', 'street']):
                 street_col = col
-            elif any(keyword in col_lower for keyword in ['hausnummer', 'haus nummer', 'nummer', 'nr']):
+            elif any(keyword in col_lower for keyword in ['hausnummer', 'haus nummer', 'haus-nummer']) or (col_lower == 'nummer' or col_lower == 'nr'):
                 house_num_col = col
             elif any(keyword in col_lower for keyword in ['zusatz', 'zusätze']):
                 zusatz_col = col
