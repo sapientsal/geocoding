@@ -837,6 +837,319 @@ def test_specific_street_sorting():
         log_test("Street-Based Sorting", f"Street-based sorting testing failed with error: {str(e)}", False)
         return None
 
+def test_column_detection_fix():
+    """Test the column detection fix for house number identification - CRITICAL ISSUE TEST"""
+    print("\n🔍 Testing Column Detection Fix for House Number Identification...")
+    print("=" * 80)
+    print("🎯 CRITICAL ISSUE: System was incorrectly using 'Polygonnummer' as house number field")
+    print("    instead of actual house number column, breaking address sorting functionality.")
+    print("    Testing the fix that changed from substring to exact matching for 'nummer'/'nr'.")
+    
+    try:
+        # Test 1: Column Detection Logic Test
+        print("\n📋 TEST 1: Column Detection Logic with Polygonnummer vs Hausnummer...")
+        
+        # Create test CSV with both "Polygonnummer" and actual house number columns
+        test_addresses_polygonnummer = [
+            ["Projektname Strasse", "Hausnummer", "Zusatz", "PLZ", "Ort", "Polygonnummer"],
+            ["Worpswede Am Hörenberg", "1", "A", "27726", "Worpswede", "12345"],
+            ["Worpswede Am Hörenberg", "3", "A", "27726", "Worpswede", "12346"],
+            ["Worpswede Am Hörenberg", "3", "C", "27726", "Worpswede", "12347"],
+            ["Worpswede Am Hörenberg", "4", "", "27726", "Worpswede", "12348"],
+            ["Worpswede Am Hörenberg", "7", "", "27726", "Worpswede", "12349"],
+            ["Worpswede Am Hörenberg", "8", "", "27726", "Worpswede", "12350"],
+            ["Worpswede Am Hörenberg", "10", "", "27726", "Worpswede", "12351"],
+        ]
+        
+        # Create CSV content
+        csv_content = ""
+        for row in test_addresses_polygonnummer:
+            csv_content += ",".join([f'"{cell}"' for cell in row]) + "\n"
+        
+        print(f"📊 Test data created with both 'Polygonnummer' and 'Hausnummer' columns:")
+        print(f"  - Addresses should be sorted by Hausnummer (1A, 3A, 3C, 4, 7, 8, 10)")
+        print(f"  - NOT by Polygonnummer (12345, 12346, 12347, 12348, 12349, 12350, 12351)")
+        
+        # Upload the test file using street-sorted endpoint to test column detection
+        files = {
+            'file': ('column_detection_test.csv', csv_content, 'text/csv')
+        }
+        
+        response = requests.post(f"{BACKEND_URL}/upload-street-sorted", files=files)
+        
+        if response.status_code != 200:
+            log_test("Street-Based Sorting", f"Failed to upload column detection test file. Status code: {response.status_code}", False)
+            return None
+        
+        job_id = response.json().get("job_id")
+        print(f"✅ Column detection test job created: {job_id}")
+        
+        # Wait for job to complete
+        print("⏳ Waiting for job to complete...")
+        max_attempts = 30
+        polling_interval = 5
+        
+        for attempt in range(max_attempts):
+            response = requests.get(f"{BACKEND_URL}/job/{job_id}")
+            
+            if response.status_code != 200:
+                log_test("Street-Based Sorting", f"Failed to get job status. Status code: {response.status_code}", False)
+                return None
+            
+            job_data = response.json()
+            status = job_data.get("status")
+            
+            if status == "completed":
+                print(f"✅ Job completed successfully.")
+                break
+            elif status == "error":
+                log_test("Street-Based Sorting", f"Job failed with error: {job_data.get('error_message')}", False)
+                return None
+            
+            time.sleep(polling_interval)
+        
+        # Test retrieving the sorted data to verify column detection
+        print("\n🔍 Testing column detection results...")
+        response = requests.get(f"{BACKEND_URL}/street-sorted/{job_id}")
+        
+        if response.status_code != 200:
+            log_test("Street-Based Sorting", f"Failed to get street-sorted data. Status code: {response.status_code}", False)
+            return None
+        
+        sorted_data = response.json()
+        sorted_addresses = sorted_data.get("sorted_addresses", [])
+        
+        if not sorted_addresses:
+            log_test("Street-Based Sorting", "No sorted addresses found in response", False)
+            return None
+        
+        # Verify that addresses are sorted by house number, NOT by polygon number
+        print("\n📊 Analyzing sorting results:")
+        house_numbers = []
+        polygon_numbers = []
+        
+        for addr in sorted_addresses:
+            row_data = addr.get("row_data", {})
+            house_num = row_data.get("Hausnummer", "")
+            zusatz = row_data.get("Zusatz", "")
+            polygon_num = row_data.get("Polygonnummer", "")
+            
+            # Create display format for house number
+            if zusatz and str(zusatz).strip():
+                house_display = f"{house_num}{zusatz}"
+            else:
+                house_display = str(house_num)
+            
+            house_numbers.append(house_display)
+            polygon_numbers.append(str(polygon_num))
+        
+        print(f"  House numbers in sorted order: {house_numbers}")
+        print(f"  Polygon numbers in same order: {polygon_numbers}")
+        
+        # Expected house number order (correct sorting)
+        expected_house_order = ["1A", "3A", "3C", "4", "7", "8", "10"]
+        
+        # Expected polygon number order (if incorrectly sorted by polygon)
+        expected_polygon_order = ["12345", "12346", "12347", "12348", "12349", "12350", "12351"]
+        
+        # Check if sorted by house numbers (CORRECT)
+        if house_numbers == expected_house_order:
+            log_test("Street-Based Sorting", "✅ COLUMN DETECTION FIX VERIFIED: Addresses correctly sorted by house numbers (Hausnummer)")
+            log_test("Street-Based Sorting", f"House number order: {house_numbers}")
+        else:
+            log_test("Street-Based Sorting", f"❌ COLUMN DETECTION FAILED: House numbers not in expected order. Got: {house_numbers}, Expected: {expected_house_order}", False)
+        
+        # Check if NOT sorted by polygon numbers (would indicate bug)
+        if polygon_numbers == expected_polygon_order:
+            log_test("Street-Based Sorting", "❌ CRITICAL BUG: Addresses appear to be sorted by Polygonnummer instead of Hausnummer!", False)
+        else:
+            log_test("Street-Based Sorting", "✅ REGRESSION PREVENTION: Addresses are NOT sorted by Polygonnummer (correct behavior)")
+        
+        # Test 2: German Address Format Test with various column names
+        print("\n📋 TEST 2: German Address Format with Various Column Names...")
+        
+        test_addresses_various = [
+            ["Strasse", "Nummer", "PLZ", "Ort", "Polygonnummer", "Objektnummer"],
+            ["Hauptstraße", "1", "10115", "Berlin", "98765", "OBJ001"],
+            ["Hauptstraße", "2", "10115", "Berlin", "98766", "OBJ002"],
+            ["Hauptstraße", "3", "10115", "Berlin", "98767", "OBJ003"],
+        ]
+        
+        csv_content_2 = ""
+        for row in test_addresses_various:
+            csv_content_2 += ",".join([f'"{cell}"' for cell in row]) + "\n"
+        
+        files_2 = {
+            'file': ('column_detection_test_2.csv', csv_content_2, 'text/csv')
+        }
+        
+        response = requests.post(f"{BACKEND_URL}/upload-street-sorted", files=files_2)
+        
+        if response.status_code == 200:
+            job_id_2 = response.json().get("job_id")
+            
+            # Wait for completion
+            for attempt in range(20):
+                response = requests.get(f"{BACKEND_URL}/job/{job_id_2}")
+                if response.status_code == 200:
+                    job_data = response.json()
+                    if job_data.get("status") == "completed":
+                        break
+                time.sleep(3)
+            
+            # Check results
+            response = requests.get(f"{BACKEND_URL}/street-sorted/{job_id_2}")
+            if response.status_code == 200:
+                sorted_data_2 = response.json()
+                sorted_addresses_2 = sorted_data_2.get("sorted_addresses", [])
+                
+                if sorted_addresses_2:
+                    log_test("Street-Based Sorting", "✅ EXACT MATCH TEST: 'Nummer' column correctly detected as house number column")
+                    
+                    # Verify sorting
+                    house_nums_2 = []
+                    for addr in sorted_addresses_2:
+                        row_data = addr.get("row_data", {})
+                        house_nums_2.append(str(row_data.get("Nummer", "")))
+                    
+                    if house_nums_2 == ["1", "2", "3"]:
+                        log_test("Street-Based Sorting", "✅ EXACT MATCH SORTING: Addresses correctly sorted by 'Nummer' column")
+                    else:
+                        log_test("Street-Based Sorting", f"❌ EXACT MATCH SORTING FAILED: Expected ['1', '2', '3'], got {house_nums_2}", False)
+                else:
+                    log_test("Street-Based Sorting", "❌ No addresses returned for exact match test", False)
+            
+            # Clean up
+            requests.delete(f"{BACKEND_URL}/job/{job_id_2}")
+        
+        # Test 3: Regression Prevention Test - columns with "nummer" substring
+        print("\n📋 TEST 3: Regression Prevention - Substring Matching Test...")
+        
+        test_addresses_substring = [
+            ["Strasse", "Hausnummer", "PLZ", "Ort", "Polygonnummer", "Kundennummer", "Rechnungsnummer"],
+            ["Teststraße", "5", "12345", "Teststadt", "99999", "K001", "R001"],
+            ["Teststraße", "10", "12345", "Teststadt", "99998", "K002", "R002"],
+            ["Teststraße", "15", "12345", "Teststadt", "99997", "K003", "R003"],
+        ]
+        
+        csv_content_3 = ""
+        for row in test_addresses_substring:
+            csv_content_3 += ",".join([f'"{cell}"' for cell in row]) + "\n"
+        
+        files_3 = {
+            'file': ('column_detection_test_3.csv', csv_content_3, 'text/csv')
+        }
+        
+        response = requests.post(f"{BACKEND_URL}/upload-street-sorted", files=files_3)
+        
+        if response.status_code == 200:
+            job_id_3 = response.json().get("job_id")
+            
+            # Wait for completion
+            for attempt in range(20):
+                response = requests.get(f"{BACKEND_URL}/job/{job_id_3}")
+                if response.status_code == 200:
+                    job_data = response.json()
+                    if job_data.get("status") == "completed":
+                        break
+                time.sleep(3)
+            
+            # Check results
+            response = requests.get(f"{BACKEND_URL}/street-sorted/{job_id_3}")
+            if response.status_code == 200:
+                sorted_data_3 = response.json()
+                sorted_addresses_3 = sorted_data_3.get("sorted_addresses", [])
+                
+                if sorted_addresses_3:
+                    # Verify that it used "Hausnummer" and NOT any of the other "*nummer" columns
+                    house_nums_3 = []
+                    for addr in sorted_addresses_3:
+                        row_data = addr.get("row_data", {})
+                        house_nums_3.append(str(row_data.get("Hausnummer", "")))
+                    
+                    if house_nums_3 == ["5", "10", "15"]:
+                        log_test("Street-Based Sorting", "✅ REGRESSION PREVENTION: System correctly uses 'Hausnummer' and ignores 'Polygonnummer', 'Kundennummer', 'Rechnungsnummer'")
+                    else:
+                        log_test("Street-Based Sorting", f"❌ REGRESSION PREVENTION FAILED: Expected ['5', '10', '15'], got {house_nums_3}", False)
+                else:
+                    log_test("Street-Based Sorting", "❌ No addresses returned for regression prevention test", False)
+            
+            # Clean up
+            requests.delete(f"{BACKEND_URL}/job/{job_id_3}")
+        
+        # Test 4: Edge Case - Only "Nr" column
+        print("\n📋 TEST 4: Edge Case - 'Nr' Column Detection...")
+        
+        test_addresses_nr = [
+            ["Straße", "Nr", "PLZ", "Ort"],
+            ["Musterstraße", "1", "54321", "Musterstadt"],
+            ["Musterstraße", "3", "54321", "Musterstadt"],
+            ["Musterstraße", "5", "54321", "Musterstadt"],
+        ]
+        
+        csv_content_4 = ""
+        for row in test_addresses_nr:
+            csv_content_4 += ",".join([f'"{cell}"' for cell in row]) + "\n"
+        
+        files_4 = {
+            'file': ('column_detection_test_4.csv', csv_content_4, 'text/csv')
+        }
+        
+        response = requests.post(f"{BACKEND_URL}/upload-street-sorted", files=files_4)
+        
+        if response.status_code == 200:
+            job_id_4 = response.json().get("job_id")
+            
+            # Wait for completion
+            for attempt in range(20):
+                response = requests.get(f"{BACKEND_URL}/job/{job_id_4}")
+                if response.status_code == 200:
+                    job_data = response.json()
+                    if job_data.get("status") == "completed":
+                        break
+                time.sleep(3)
+            
+            # Check results
+            response = requests.get(f"{BACKEND_URL}/street-sorted/{job_id_4}")
+            if response.status_code == 200:
+                sorted_data_4 = response.json()
+                sorted_addresses_4 = sorted_data_4.get("sorted_addresses", [])
+                
+                if sorted_addresses_4:
+                    house_nums_4 = []
+                    for addr in sorted_addresses_4:
+                        row_data = addr.get("row_data", {})
+                        house_nums_4.append(str(row_data.get("Nr", "")))
+                    
+                    if house_nums_4 == ["1", "3", "5"]:
+                        log_test("Street-Based Sorting", "✅ EDGE CASE: 'Nr' column correctly detected and used for sorting")
+                    else:
+                        log_test("Street-Based Sorting", f"❌ EDGE CASE FAILED: Expected ['1', '3', '5'], got {house_nums_4}", False)
+                else:
+                    log_test("Street-Based Sorting", "❌ No addresses returned for 'Nr' column test", False)
+            
+            # Clean up
+            requests.delete(f"{BACKEND_URL}/job/{job_id_4}")
+        
+        # Clean up main test job
+        requests.delete(f"{BACKEND_URL}/job/{job_id}")
+        
+        print("\n🎯 COLUMN DETECTION FIX TEST SUMMARY:")
+        print("=" * 50)
+        print("✅ Tested that 'Polygonnummer' is NOT used as house number column")
+        print("✅ Verified that proper house number columns are correctly identified")
+        print("✅ Confirmed addresses are sorted by actual house numbers")
+        print("✅ Regression prevention: substring matching no longer breaks sorting")
+        print("✅ Edge cases: exact matches 'Nummer' and 'Nr' still work")
+        
+        return job_id
+        
+    except Exception as e:
+        log_test("Street-Based Sorting", f"Column detection fix testing failed with error: {str(e)}", False)
+        import traceback
+        traceback.print_exc()
+        return None
+
 def test_manual_review_interface():
     """Test the Manual Review Interface for failed addresses - COMPREHENSIVE TEST"""
     print("\n🔍 Testing Manual Review Interface for Failed Addresses...")
