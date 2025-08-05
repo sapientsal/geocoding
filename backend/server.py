@@ -569,15 +569,22 @@ def optimize_geographic_route(df, geocoded_data, addresses_to_geocode):
             valid_coords = street_addresses.dropna(subset=['latitude', 'longitude'])
             
             if len(valid_coords) > 0:
-                # Calculate center of street
+                # Calculate center of street using valid coordinates
                 center_lat = valid_coords['latitude'].mean()
                 center_lon = valid_coords['longitude'].mean()
                 street_centers[street_name] = (center_lat, center_lon)
+                # CRITICAL FIX: Always include the ENTIRE street (with both valid and invalid addresses)
+                # This preserves street grouping and house number sorting within each street
                 street_groups.append((street_name, street_addresses))
+                
+                # Log if street has mixed results
+                if len(valid_coords) < len(street_addresses):
+                    failed_count = len(street_addresses) - len(valid_coords)
+                    print(f"Street '{street_name}': {len(valid_coords)} geocoded, {failed_count} failed addresses (keeping street grouped)")
             else:
-                # Keep track of streets with no valid coordinates (failed addresses only)
+                # Only separate streets that have NO valid coordinates at all (all addresses failed)
                 streets_without_coords.append((street_name, street_addresses))
-                print(f"Warning: Street '{street_name}' has no valid coordinates, will be added at the end")
+                print(f"Warning: Street '{street_name}' has no valid coordinates (all {len(street_addresses)} addresses failed), will be added at the end")
         
         # Sort street groups by geographic proximity
         if len(street_groups) > 1:
