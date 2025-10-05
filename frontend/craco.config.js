@@ -32,20 +32,10 @@ module.exports = {
   },
   devServer: {
     // Fix WebSocket HTTPS issue
-    client: {
-      webSocketURL: {
-        protocol: 'wss',
-        hostname: '0.0.0.0',
-        port: 443,
-        pathname: '/ws'
-      },
-      overlay: {
-        errors: true,
-        warnings: false,
-      },
-    },
-    // Additional HTTPS configurations
-    https: process.env.HTTPS === 'true',
+    hot: false,
+    liveReload: false,
+    client: false, // Disable WebSocket completely
+    // Additional configurations
     allowedHosts: 'all',
   },
 };
