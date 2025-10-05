@@ -30,5 +30,23 @@ module.exports = {
       return webpackConfig;
     },
   },
+  devServer: {
+    // Fix WebSocket HTTPS issue
+    client: {
+      webSocketURL: {
+        protocol: 'wss',
+        hostname: '0.0.0.0',
+        port: 443,
+        pathname: '/ws'
+      },
+      overlay: {
+        errors: true,
+        warnings: false,
+      },
+    },
+    // Additional HTTPS configurations
+    https: process.env.HTTPS === 'true',
+    allowedHosts: 'all',
+  },
 };
   
