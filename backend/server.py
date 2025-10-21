@@ -2067,17 +2067,17 @@ async def process_street_sorted_job(job_id: str, file_content: bytes, filename: 
                                                        ordered=True)
                 working_df['street_city_category'] = street_city_categories
                 
-                # Sort by street first, then house number
+                # Sort by street+city first, then house number
                 working_df_sorted = working_df.sort_values(
-                    ['street_category', 'house_number_numeric', 'house_number_letter'],
+                    ['street_city_category', 'house_number_numeric', 'house_number_letter'],
                     na_position='last'
                 )
                 
                 # Debug output
-                print("Sorted addresses:")
+                print("Sorted addresses with street+city grouping:")
                 for i in range(min(10, len(working_df_sorted))):
                     row = working_df_sorted.iloc[i]
-                    print(f"{i+1}. {row['street_clean']} {row['house_number_numeric']}{row['house_number_letter']}")
+                    print(f"{i+1}. {row['street_city_key']} {row['house_number_numeric']}{row['house_number_letter']}")
                 
                 # Get the original indices in the new order
                 original_indices = working_df_sorted['original_index'].tolist()
