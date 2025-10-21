@@ -1996,6 +1996,22 @@ async def process_street_sorted_job(job_id: str, file_content: bytes, filename: 
             
             working_df['street_clean'] = working_df[street_col].apply(clean_street_name)
             
+            # CRITICAL FIX: Create street_city_key for proper grouping
+            def create_street_city_key(row):
+                street = str(row['street_clean']).strip()
+                city = str(row.get(ort_col, '')).strip() if ort_col else ''
+                
+                if street == '' or street == 'nan':
+                    return ''
+                
+                # Create unique key: "Straße, Stadt"
+                if city and city != '' and city != 'nan':
+                    return f"{street}, {city}"
+                else:
+                    return street
+            
+            working_df['street_city_key'] = working_df.apply(create_street_city_key, axis=1)
+            
             # Extract house number parts for sorting
             def extract_house_number_parts(value):
                 if pd.isna(value) or str(value).strip() == '':
