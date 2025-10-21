@@ -364,6 +364,7 @@ def sort_addresses_by_street_and_house_number(df, geocoded_data):
     
     # Fill NaN values for sorting
     working_df['street_clean'] = working_df['street_clean'].fillna('')
+    working_df['street_city_key'] = working_df['street_city_key'].fillna('')
     
     # Ensure numeric values are integers and not NaN
     working_df['house_number_numeric'] = working_df['house_number_numeric'].apply(
@@ -371,26 +372,33 @@ def sort_addresses_by_street_and_house_number(df, geocoded_data):
     )
     working_df['house_number_letter'] = working_df['house_number_letter'].fillna('')
     
-    # Sort by street name (PRIMARY), then house number (SECONDARY), then letter (TERTIARY)
+    # Sort by street+city (PRIMARY), then house number (SECONDARY), then letter (TERTIARY)
     try:
-        # IMPORTANT FIX: We need to ensure the sorting is stable and properly groups streets
-        # First, create a categorical variable for street names to ensure they stay together
-        street_categories = pd.Categorical(working_df['street_clean'], 
-                                          categories=sorted(working_df['street_clean'].unique()),
-                                          ordered=True)
-        working_df['street_category'] = street_categories
+        # CRITICAL FIX: Create categorical variable for street_city_key to ensure proper grouping
+        # This ensures that "Weidenweg, Peitz" and "Weidenweg, Turnow-Preilack" are separate groups
+        street_city_categories = pd.Categorical(working_df['street_city_key'], 
+                                               categories=sorted(working_df['street_city_key'].unique()),
+                                               ordered=True)
+        working_df['street_city_category'] = street_city_categories
         
-        # Now sort with the categorical street first
+        # Now sort with the categorical street+city first
         working_df_sorted = working_df.sort_values([
-            'street_category',        # PRIMARY: Group by street first (as categorical)
-            'house_number_numeric',   # SECONDARY: Then by house number
-            'house_number_letter'     # TERTIARY: Then by letter suffix
+            'street_city_category',      # PRIMARY: Group by street+city first (as categorical)
+            'house_number_numeric',      # SECONDARY: Then by house number
+            'house_number_letter'        # TERTIARY: Then by letter suffix
         ], na_position='last')
         
-        print(f"Debug: Sorting completed. First 10 addresses after sorting:")
+        print(f"Debug: Sorting completed with street+city grouping. First 10 addresses after sorting:")
         for i in range(min(10, len(working_df_sorted))):
             row = working_df_sorted.iloc[i]
-            print(f"  {i+1}. {row['street_clean']} {row['house_number_numeric']}{row['house_number_letter']}")
+            print(f"  {i+1}. {row['street_city_key']} {row['house_number_numeric']}{row['house_number_letter']}")
+        
+        # Debug: Show unique street+city combinations
+        print(f"\nDebug: Street+City groups found:")
+        for street_city in sorted(working_df_sorted['street_city_key'].unique()):
+            if street_city != '':
+                count = len(working_df_sorted[working_df_sorted['street_city_key'] == street_city])
+                print(f"  - '{street_city}': {count} addresses")
             
     except Exception as e:
         print(f"Error during sorting: {e}")
