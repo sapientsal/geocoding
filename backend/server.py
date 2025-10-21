@@ -256,6 +256,7 @@ def sort_addresses_by_street_and_house_number(df, geocoded_data):
     # Detect address columns
     street_col = None
     house_num_col = None
+    ort_col = None
     
     for col in working_df.columns:
         col_lower = col.lower().strip()
@@ -263,6 +264,8 @@ def sort_addresses_by_street_and_house_number(df, geocoded_data):
             street_col = col
         elif any(keyword in col_lower for keyword in ['hausnummer', 'haus nummer', 'haus-nummer']) or (col_lower == 'nummer' or col_lower == 'nr'):
             house_num_col = col
+        elif any(keyword in col_lower for keyword in ['ort', 'stadt', 'city', 'location']):
+            ort_col = col
     
     if not street_col or not house_num_col:
         print("Warning: Could not detect street and house number columns for sorting")
