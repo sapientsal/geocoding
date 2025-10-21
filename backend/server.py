@@ -496,7 +496,7 @@ def optimize_geographic_route(df, geocoded_data, addresses_to_geocode):
             working_df.loc[i, 'geocoding_error'] = geocoded.get('error', '')
     
     # Detect street and house number columns for proper sorting
-    street_col = house_num_col = None
+    street_col = house_num_col = ort_col = None
     
     for col in working_df.columns:
         col_lower = col.lower().strip()
@@ -504,8 +504,10 @@ def optimize_geographic_route(df, geocoded_data, addresses_to_geocode):
             street_col = col
         elif any(keyword in col_lower for keyword in ['hausnummer', 'haus nummer', 'haus-nummer']) or (col_lower == 'nummer' or col_lower == 'nr'):
             house_num_col = col
+        elif any(keyword in col_lower for keyword in ['ort', 'stadt', 'city', 'location']):
+            ort_col = col
     
-    print(f"Detected columns - Street: {street_col}, House Number: {house_num_col}")
+    print(f"Detected columns - Street: {street_col}, House Number: {house_num_col}, City: {ort_col}")
     
     # If we have street and house number columns, do street-based sorting first
     if street_col and house_num_col:
