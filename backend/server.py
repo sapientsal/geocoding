@@ -336,8 +336,25 @@ def sort_addresses_by_street_and_house_number(df, geocoded_data):
     
     working_df['street_clean'] = working_df[street_col].apply(clean_street_name)
     
-    # Debug: Print unique street names to verify grouping
-    unique_streets = working_df['street_clean'].value_counts()
+    # CRITICAL FIX: Create street_city_key for proper grouping
+    # This ensures that same street names in different cities are treated as separate streets
+    def create_street_city_key(row):
+        street = str(row['street_clean']).strip()
+        city = str(row.get(ort_col, '')).strip() if ort_col else ''
+        
+        if street == '' or street == 'nan':
+            return ''
+        
+        # Create unique key: "Straße, Stadt"
+        if city and city != '' and city != 'nan':
+            return f"{street}, {city}"
+        else:
+            return street
+    
+    working_df['street_city_key'] = working_df.apply(create_street_city_key, axis=1)
+    
+    # Debug: Print unique street-city combinations to verify grouping
+    unique_streets = working_df['street_city_key'].value_counts()
     print(f"Debug: Found {len(unique_streets)} unique streets:")
     for street, count in unique_streets.head(10).items():
         print(f"  - '{street}': {count} addresses")
