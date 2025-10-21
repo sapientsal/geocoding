@@ -2058,14 +2058,14 @@ async def process_street_sorted_job(job_id: str, file_content: bytes, filename: 
             working_df['house_number_numeric'] = working_df['house_number_numeric'].fillna(0).astype(int)
             working_df['house_number_letter'] = working_df['house_number_letter'].fillna('')
             
-            # Group by street and sort by house number
+            # Group by street+city and sort by house number
             try:
-                # First, create a categorical variable for street names to ensure they stay together
-                unique_streets = sorted(working_df['street_clean'].unique())
-                street_categories = pd.Categorical(working_df['street_clean'], 
-                                                categories=unique_streets,
-                                                ordered=True)
-                working_df['street_category'] = street_categories
+                # CRITICAL FIX: Create categorical variable for street_city_key to ensure proper grouping
+                unique_street_cities = sorted(working_df['street_city_key'].unique())
+                street_city_categories = pd.Categorical(working_df['street_city_key'], 
+                                                       categories=unique_street_cities,
+                                                       ordered=True)
+                working_df['street_city_category'] = street_city_categories
                 
                 # Sort by street first, then house number
                 working_df_sorted = working_df.sort_values(
