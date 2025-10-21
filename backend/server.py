@@ -630,8 +630,8 @@ def optimize_geographic_route(df, geocoded_data, addresses_to_geocode):
                 min_distance = float('inf')
                 next_street_idx = 0
                 
-                for i, (street_name, _) in enumerate(remaining_streets):
-                    street_center = street_centers[street_name]
+                for i, (street_city_key, _) in enumerate(remaining_streets):
+                    street_center = street_centers[street_city_key]
                     distance = calculate_distance_meters(
                         current_center[0], current_center[1],
                         street_center[0], street_center[1]
@@ -646,7 +646,7 @@ def optimize_geographic_route(df, geocoded_data, addresses_to_geocode):
             
             # Rebuild the dataframe in optimized street order
             optimized_parts = []
-            for street_name, street_addresses in optimized_street_order:
+            for street_city_key, street_addresses in optimized_street_order:
                 optimized_parts.append(street_addresses)
             
             # Add streets with no valid coordinates at the end
