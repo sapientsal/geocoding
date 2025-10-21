@@ -590,11 +590,11 @@ def optimize_geographic_route(df, geocoded_data, addresses_to_geocode):
                 'house_number_letter'     # TERTIARY: Letter suffix
             ], na_position='last')
             
-            print("Street-based sorting completed. Sample of sorted addresses:")
+            print("Street+City-based sorting completed. Sample of sorted addresses:")
             for i in range(min(15, len(working_df_sorted))):
                 row = working_df_sorted.iloc[i]
                 house_display = f"{int(row['house_number_numeric'])}{row['house_number_letter']}" if row['house_number_numeric'] > 0 else "?"
-                print(f"  {i+1:2d}. {row['street_clean']:<25} {house_display}")
+                print(f"  {i+1:2d}. {row['street_city_key']:<35} {house_display}")
                 
         except Exception as e:
             print(f"Error during street-based sorting: {e}")
