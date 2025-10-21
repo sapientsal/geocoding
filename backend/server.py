@@ -578,13 +578,14 @@ def optimize_geographic_route(df, geocoded_data, addresses_to_geocode):
         
         # Fill NaN values
         working_df['street_clean'] = working_df['street_clean'].fillna('')
+        working_df['street_city_key'] = working_df['street_city_key'].fillna('')
         working_df['house_number_numeric'] = working_df['house_number_numeric'].fillna(0)
         working_df['house_number_letter'] = working_df['house_number_letter'].fillna('')
         
-        # Sort by street FIRST, then house number SECOND
+        # Sort by street+city FIRST, then house number SECOND
         try:
             working_df_sorted = working_df.sort_values([
-                'street_clean',           # PRIMARY: Group by street
+                'street_city_key',        # PRIMARY: Group by street+city
                 'house_number_numeric',   # SECONDARY: Numeric house number
                 'house_number_letter'     # TERTIARY: Letter suffix
             ], na_position='last')
