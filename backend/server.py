@@ -266,6 +266,9 @@ def sort_addresses_by_street_and_house_number(df, geocoded_data):
             house_num_col = col
         elif any(keyword in col_lower for keyword in ['ort', 'stadt', 'city', 'location']):
             ort_col = col
+        elif any(keyword in col_lower for keyword in ['teilort', 'stadtteil', 'ortsteil', 'district']):
+            # Teilort has higher priority than Ort for better local grouping
+            ort_col = col
     
     if not street_col or not house_num_col:
         print("Warning: Could not detect street and house number columns for sorting")
@@ -505,6 +508,9 @@ def optimize_geographic_route(df, geocoded_data, addresses_to_geocode):
         elif any(keyword in col_lower for keyword in ['hausnummer', 'haus nummer', 'haus-nummer']) or (col_lower == 'nummer' or col_lower == 'nr'):
             house_num_col = col
         elif any(keyword in col_lower for keyword in ['ort', 'stadt', 'city', 'location']):
+            ort_col = col
+        elif any(keyword in col_lower for keyword in ['teilort', 'stadtteil', 'ortsteil', 'district']):
+            # Teilort has higher priority than Ort for better local grouping
             ort_col = col
     
     print(f"Detected columns - Street: {street_col}, House Number: {house_num_col}, City: {ort_col}")
