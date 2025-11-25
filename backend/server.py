@@ -1604,11 +1604,12 @@ async def process_upload_job(job_id: str, file_content: bytes, filename: str):
             # Build complete address based on format
             if has_german_format:
                 # German format: combine separate columns
-                street = str(row[street_col]).strip() if street_col else ""
-                house_num = str(row[house_num_col]).strip() if house_num_col else ""
-                zusatz = str(row[zusatz_col]).strip() if zusatz_col else ""
-                plz = str(row[plz_col]).strip() if plz_col else ""
-                ort = str(row[ort_col]).strip() if ort_col else ""
+                # CRITICAL FIX: Use clean_numeric_string to avoid .0 in addresses
+                street = clean_numeric_string(row[street_col]) if street_col else ""
+                house_num = clean_numeric_string(row[house_num_col]) if house_num_col else ""
+                zusatz = clean_numeric_string(row[zusatz_col]) if zusatz_col else ""
+                plz = clean_numeric_string(row[plz_col]) if plz_col else ""
+                ort = clean_numeric_string(row[ort_col]) if ort_col else ""
                 
                 # Skip empty rows
                 if not street or not ort or street.lower() == 'nan' or ort.lower() == 'nan':
