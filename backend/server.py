@@ -1516,6 +1516,7 @@ async def process_upload_job(job_id: str, file_content: bytes, filename: str):
         zusatz_col = None
         plz_col = None
         ort_col = None
+        teilort_col = None
         
         # Map specific German column names to address components
         for col in df.columns:
@@ -1528,11 +1529,16 @@ async def process_upload_job(job_id: str, file_content: bytes, filename: str):
                 zusatz_col = col
             elif any(keyword in col_lower for keyword in ['plz', 'postleitzahl', 'postal']):
                 plz_col = col
-            elif any(keyword in col_lower for keyword in ['ort', 'stadt', 'city', 'location']):
+            elif any(keyword in col_lower for keyword in ['ort', 'stadt', 'city', 'location']) and 'teil' not in col_lower:
+                # Only match "Ort" columns, not "Teilort"
                 ort_col = col
             elif any(keyword in col_lower for keyword in ['teilort', 'stadtteil', 'ortsteil', 'district']):
-                # Teilort has higher priority than Ort for better local grouping
-                ort_col = col
+                # Keep Teilort separate
+                teilort_col = col
+        
+        # CRITICAL FIX: For geocoding, prefer "Ort" (main city) over "Teilort" (sub-locality)
+        if not ort_col and teilort_col:
+            ort_col = teilort_col
         
         # Check if we have German format (separate columns)
         has_german_format = street_col and house_num_col and plz_col and ort_col
