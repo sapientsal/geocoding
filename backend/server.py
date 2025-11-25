@@ -1687,7 +1687,11 @@ async def process_upload_job(job_id: str, file_content: bytes, filename: str):
                 "geocoded": lat is not None and lon is not None,
                 "geocoding_error": error,
                 # ALLE ursprünglichen Excel-Daten speichern
-                "original_row_data": {col: str(row[col]) if pd.notna(row[col]) else "" for col in df.columns},
+                # CRITICAL FIX: Handle NaT values properly - convert to None instead of string
+                "original_row_data": {
+                    col: None if pd.isna(row[col]) else (str(row[col]) if not isinstance(row[col], pd.Timestamp) else row[col].isoformat())
+                    for col in df.columns
+                },
                 "original_row_index": index
             }
             
