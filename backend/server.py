@@ -1863,7 +1863,7 @@ async def process_street_sorted_job(job_id: str, file_content: bytes, filename: 
             return
         
         # Detect address format and create address list
-        street_col = house_num_col = zusatz_col = plz_col = ort_col = None
+        street_col = house_num_col = zusatz_col = plz_col = ort_col = teilort_col = None
         
         for col in df.columns:
             col_lower = col.lower().strip()
@@ -1875,11 +1875,16 @@ async def process_street_sorted_job(job_id: str, file_content: bytes, filename: 
                 zusatz_col = col
             elif any(keyword in col_lower for keyword in ['plz', 'postleitzahl', 'postal']):
                 plz_col = col
-            elif any(keyword in col_lower for keyword in ['ort', 'stadt', 'city', 'location']):
+            elif any(keyword in col_lower for keyword in ['ort', 'stadt', 'city', 'location']) and 'teil' not in col_lower:
+                # Only match "Ort" columns, not "Teilort"
                 ort_col = col
             elif any(keyword in col_lower for keyword in ['teilort', 'stadtteil', 'ortsteil', 'district']):
-                # Teilort has higher priority than Ort for better local grouping
-                ort_col = col
+                # Keep Teilort separate
+                teilort_col = col
+        
+        # CRITICAL FIX: For geocoding, prefer "Ort" (main city) over "Teilort" (sub-locality)
+        if not ort_col and teilort_col:
+            ort_col = teilort_col
         
         has_german_format = street_col and house_num_col and plz_col and ort_col
         
@@ -2348,7 +2353,7 @@ async def process_geographic_optimization_job(job_id: str, file_content: bytes, 
             return
         
         # Detect address format and create address list
-        street_col = house_num_col = zusatz_col = plz_col = ort_col = None
+        street_col = house_num_col = zusatz_col = plz_col = ort_col = teilort_col = None
         
         for col in df.columns:
             col_lower = col.lower().strip()
@@ -2360,11 +2365,16 @@ async def process_geographic_optimization_job(job_id: str, file_content: bytes, 
                 zusatz_col = col
             elif any(keyword in col_lower for keyword in ['plz', 'postleitzahl', 'postal']):
                 plz_col = col
-            elif any(keyword in col_lower for keyword in ['ort', 'stadt', 'city', 'location']):
+            elif any(keyword in col_lower for keyword in ['ort', 'stadt', 'city', 'location']) and 'teil' not in col_lower:
+                # Only match "Ort" columns, not "Teilort"
                 ort_col = col
             elif any(keyword in col_lower for keyword in ['teilort', 'stadtteil', 'ortsteil', 'district']):
-                # Teilort has higher priority than Ort for better local grouping
-                ort_col = col
+                # Keep Teilort separate
+                teilort_col = col
+        
+        # CRITICAL FIX: For geocoding, prefer "Ort" (main city) over "Teilort" (sub-locality)
+        if not ort_col and teilort_col:
+            ort_col = teilort_col
         
         has_german_format = street_col and house_num_col and plz_col and ort_col
         
