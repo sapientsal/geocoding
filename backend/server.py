@@ -1924,11 +1924,12 @@ async def process_street_sorted_job(job_id: str, file_content: bytes, filename: 
         addresses_to_geocode = []
         if has_german_format:
             for idx, row in df.iterrows():
-                street = str(row[street_col]).strip() if pd.notna(row[street_col]) else ""
-                house_num = str(row[house_num_col]).strip() if pd.notna(row[house_num_col]) else ""
-                zusatz = str(row[zusatz_col]).strip() if zusatz_col and pd.notna(row[zusatz_col]) else ""
-                plz = str(row[plz_col]).strip() if pd.notna(row[plz_col]) else ""
-                ort = str(row[ort_col]).strip() if pd.notna(row[ort_col]) else ""
+                # CRITICAL FIX: Use clean_numeric_string to avoid .0 in addresses
+                street = clean_numeric_string(row[street_col]) if pd.notna(row[street_col]) else ""
+                house_num = clean_numeric_string(row[house_num_col]) if pd.notna(row[house_num_col]) else ""
+                zusatz = clean_numeric_string(row[zusatz_col]) if zusatz_col and pd.notna(row[zusatz_col]) else ""
+                plz = clean_numeric_string(row[plz_col]) if pd.notna(row[plz_col]) else ""
+                ort = clean_numeric_string(row[ort_col]) if pd.notna(row[ort_col]) else ""
                 
                 # Clean street name - remove project prefixes
                 if street.startswith('Worpswede '):
@@ -2414,11 +2415,12 @@ async def process_geographic_optimization_job(job_id: str, file_content: bytes, 
         addresses_to_geocode = []
         if has_german_format:
             for idx, row in df.iterrows():
-                street = str(row[street_col]).strip() if pd.notna(row[street_col]) else ""
-                house_num = str(row[house_num_col]).strip() if pd.notna(row[house_num_col]) else ""
-                zusatz = str(row[zusatz_col]).strip() if zusatz_col and pd.notna(row[zusatz_col]) else ""
-                plz = str(row[plz_col]).strip() if pd.notna(row[plz_col]) else ""
-                ort = str(row[ort_col]).strip() if pd.notna(row[ort_col]) else ""
+                # CRITICAL FIX: Use clean_numeric_string to avoid .0 in addresses
+                street = clean_numeric_string(row[street_col]) if pd.notna(row[street_col]) else ""
+                house_num = clean_numeric_string(row[house_num_col]) if pd.notna(row[house_num_col]) else ""
+                zusatz = clean_numeric_string(row[zusatz_col]) if zusatz_col and pd.notna(row[zusatz_col]) else ""
+                plz = clean_numeric_string(row[plz_col]) if pd.notna(row[plz_col]) else ""
+                ort = clean_numeric_string(row[ort_col]) if pd.notna(row[ort_col]) else ""
                 
                 # Clean street name - remove project prefixes
                 if street.startswith('Worpswede '):
