@@ -2847,6 +2847,9 @@ async def export_optimized_route(job_id: str):
                 cell.fill = header_fill
                 cell.font = header_font
             
+            # CRITICAL FIX: Apply percentage formatting to columns with '%' in name
+            worksheet = apply_percentage_formatting(worksheet, df, 'Geografisch Optimierte Route')
+            
             # Auto-adjust column widths
             for column in worksheet.columns:
                 max_length = 0
