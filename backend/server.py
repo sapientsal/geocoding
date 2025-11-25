@@ -1517,6 +1517,9 @@ async def process_upload_job(job_id: str, file_content: bytes, filename: str):
                 plz_col = col
             elif any(keyword in col_lower for keyword in ['ort', 'stadt', 'city', 'location']):
                 ort_col = col
+            elif any(keyword in col_lower for keyword in ['teilort', 'stadtteil', 'ortsteil', 'district']):
+                # Teilort has higher priority than Ort for better local grouping
+                ort_col = col
         
         # Check if we have German format (separate columns)
         has_german_format = street_col and house_num_col and plz_col and ort_col
@@ -1728,6 +1731,9 @@ async def preview_file(file: UploadFile = File(...)):
                 plz_col = col
             elif any(keyword in col_lower for keyword in ['ort', 'stadt', 'city', 'location']):
                 ort_col = col
+            elif any(keyword in col_lower for keyword in ['teilort', 'stadtteil', 'ortsteil', 'district']):
+                # Teilort has higher priority than Ort for better local grouping
+                ort_col = col
         
         has_german_format = street_col and house_num_col and plz_col and ort_col
         
@@ -1845,6 +1851,9 @@ async def process_street_sorted_job(job_id: str, file_content: bytes, filename: 
             elif any(keyword in col_lower for keyword in ['plz', 'postleitzahl', 'postal']):
                 plz_col = col
             elif any(keyword in col_lower for keyword in ['ort', 'stadt', 'city', 'location']):
+                ort_col = col
+            elif any(keyword in col_lower for keyword in ['teilort', 'stadtteil', 'ortsteil', 'district']):
+                # Teilort has higher priority than Ort for better local grouping
                 ort_col = col
         
         has_german_format = street_col and house_num_col and plz_col and ort_col
@@ -2327,6 +2336,9 @@ async def process_geographic_optimization_job(job_id: str, file_content: bytes, 
             elif any(keyword in col_lower for keyword in ['plz', 'postleitzahl', 'postal']):
                 plz_col = col
             elif any(keyword in col_lower for keyword in ['ort', 'stadt', 'city', 'location']):
+                ort_col = col
+            elif any(keyword in col_lower for keyword in ['teilort', 'stadtteil', 'ortsteil', 'district']):
+                # Teilort has higher priority than Ort for better local grouping
                 ort_col = col
         
         has_german_format = street_col and house_num_col and plz_col and ort_col
