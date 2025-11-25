@@ -262,7 +262,7 @@ def sort_addresses_by_street_and_house_number(df, geocoded_data):
         col_lower = col.lower().strip()
         if any(keyword in col_lower for keyword in ['projektname strasse', 'strasse', 'straße', 'street']):
             street_col = col
-        elif any(keyword in col_lower for keyword in ['hausnummer', 'haus nummer', 'haus-nummer']) or (col_lower == 'nummer' or col_lower == 'nr'):
+        elif any(keyword in col_lower for keyword in ['hausnummer', 'haus nummer', 'haus-nummer']) or (col_lower == 'nummer' or col_lower == 'nr' or col_lower == 'hnr'):
             house_num_col = col
         elif any(keyword in col_lower for keyword in ['ort', 'stadt', 'city', 'location']):
             ort_col = col
@@ -505,7 +505,7 @@ def optimize_geographic_route(df, geocoded_data, addresses_to_geocode):
         col_lower = col.lower().strip()
         if any(keyword in col_lower for keyword in ['projektname strasse', 'strasse', 'straße', 'street']):
             street_col = col
-        elif any(keyword in col_lower for keyword in ['hausnummer', 'haus nummer', 'haus-nummer']) or (col_lower == 'nummer' or col_lower == 'nr'):
+        elif any(keyword in col_lower for keyword in ['hausnummer', 'haus nummer', 'haus-nummer']) or (col_lower == 'nummer' or col_lower == 'nr' or col_lower == 'hnr'):
             house_num_col = col
         elif any(keyword in col_lower for keyword in ['ort', 'stadt', 'city', 'location']):
             ort_col = col
@@ -1509,7 +1509,7 @@ async def process_upload_job(job_id: str, file_content: bytes, filename: str):
             col_lower = col.lower().strip()
             if any(keyword in col_lower for keyword in ['projektname strasse', 'strasse', 'straße', 'street']):
                 street_col = col
-            elif any(keyword in col_lower for keyword in ['hausnummer', 'haus nummer', 'haus-nummer']) or (col_lower == 'nummer' or col_lower == 'nr'):
+            elif any(keyword in col_lower for keyword in ['hausnummer', 'haus nummer', 'haus-nummer']) or (col_lower == 'nummer' or col_lower == 'nr' or col_lower == 'hnr'):
                 house_num_col = col
             elif any(keyword in col_lower for keyword in ['zusatz', 'zusätze']):
                 zusatz_col = col
@@ -1723,7 +1723,7 @@ async def preview_file(file: UploadFile = File(...)):
             col_lower = col.lower().strip()
             if any(keyword in col_lower for keyword in ['projektname strasse', 'strasse', 'straße', 'street']):
                 street_col = col
-            elif any(keyword in col_lower for keyword in ['hausnummer', 'haus nummer', 'haus-nummer']) or (col_lower == 'nummer' or col_lower == 'nr'):
+            elif any(keyword in col_lower for keyword in ['hausnummer', 'haus nummer', 'haus-nummer']) or (col_lower == 'nummer' or col_lower == 'nr' or col_lower == 'hnr'):
                 house_num_col = col
             elif any(keyword in col_lower for keyword in ['zusatz', 'zusätze']):
                 zusatz_col = col
@@ -1844,7 +1844,7 @@ async def process_street_sorted_job(job_id: str, file_content: bytes, filename: 
             col_lower = col.lower().strip()
             if any(keyword in col_lower for keyword in ['projektname strasse', 'strasse', 'straße', 'street']):
                 street_col = col
-            elif any(keyword in col_lower for keyword in ['hausnummer', 'haus nummer', 'haus-nummer']) or (col_lower == 'nummer' or col_lower == 'nr'):
+            elif any(keyword in col_lower for keyword in ['hausnummer', 'haus nummer', 'haus-nummer']) or (col_lower == 'nummer' or col_lower == 'nr' or col_lower == 'hnr'):
                 house_num_col = col
             elif any(keyword in col_lower for keyword in ['zusatz', 'zusätze']):
                 zusatz_col = col
@@ -2329,7 +2329,7 @@ async def process_geographic_optimization_job(job_id: str, file_content: bytes, 
             col_lower = col.lower().strip()
             if any(keyword in col_lower for keyword in ['projektname strasse', 'strasse', 'straße', 'street']):
                 street_col = col
-            elif any(keyword in col_lower for keyword in ['hausnummer', 'haus nummer', 'haus-nummer']) or (col_lower == 'nummer' or col_lower == 'nr'):
+            elif any(keyword in col_lower for keyword in ['hausnummer', 'haus nummer', 'haus-nummer']) or (col_lower == 'nummer' or col_lower == 'nr' or col_lower == 'hnr'):
                 house_num_col = col
             elif any(keyword in col_lower for keyword in ['zusatz', 'zusätze']):
                 zusatz_col = col
