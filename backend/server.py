@@ -3473,6 +3473,7 @@ async def export_failed_addresses(job_id: str):
                 failed_df_data.append(row)
             
             failed_df = pd.DataFrame(failed_df_data)
+            failed_df = clean_dataframe_for_excel(failed_df)
             failed_df.to_excel(writer, sheet_name='Failed Addresses', index=False)
             
             # Statistics Sheet
