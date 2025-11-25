@@ -25,6 +25,37 @@ import threading
 import traceback
 from openpyxl.utils.dataframe import dataframe_to_rows
 
+def clean_numeric_string(value) -> str:
+    """
+    CRITICAL FIX: Convert numeric values to clean strings without .0 decimal points
+    
+    Problem: Excel stores numbers as floats (31275.0, 118.0), and str() keeps the .0
+    This breaks geocoding because "31275.0 Lehrte" is invalid for OpenStreetMap
+    
+    Solution: Convert floats to ints before string conversion
+    
+    Examples:
+        31275.0 -> "31275"  (not "31275.0")
+        118.0 -> "118"      (not "118.0")
+        "9 b" -> "9 b"      (strings unchanged)
+    """
+    if pd.isna(value) or value is None:
+        return ""
+    
+    # If it's a numeric type (int or float)
+    if isinstance(value, (int, float)):
+        # Check if it's a whole number (no decimal part)
+        if float(value).is_integer():
+            # Convert to int to remove .0
+            return str(int(value))
+        else:
+            # Keep decimal if it's not a whole number
+            return str(value)
+    
+    # For strings and other types, just convert to string
+    return str(value).strip()
+
+
 app = FastAPI(
     title="Sales Route Optimizer API",
     description="API for optimizing sales routes with geocoding and route optimization",
