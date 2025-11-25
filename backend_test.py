@@ -21,7 +21,8 @@ test_results = {
     "Database Operations": {"status": "Not tested", "details": []},
     "German Address Format Processing": {"status": "Not tested", "details": []},
     "Street-Based Sorting": {"status": "Not tested", "details": []},
-    "Manual Review Interface": {"status": "Not tested", "details": []}
+    "Manual Review Interface": {"status": "Not tested", "details": []},
+    "Critical Geocoding Fix Lehrte": {"status": "Not tested", "details": []}
 }
 
 def log_test(task, message, success=True):
