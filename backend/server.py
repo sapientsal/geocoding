@@ -80,6 +80,56 @@ def clean_dataframe_for_excel(df: pd.DataFrame) -> pd.DataFrame:
     
     return df_clean
 
+def apply_percentage_formatting(worksheet, df: pd.DataFrame, sheet_name: str = None):
+    """
+    CRITICAL FIX: Apply Excel percentage formatting to columns with '%' in their name
+    
+    Problem: Columns like "Penetration % aktuell" contain decimal values (0.5, 1.0)
+    which should be displayed as percentages (50%, 100%) in Excel
+    
+    Solution: Automatically detect columns with '%' in the name and apply Excel's
+    native percentage formatting
+    
+    Args:
+        worksheet: openpyxl worksheet object
+        df: DataFrame that was exported (to get column names)
+        sheet_name: Optional sheet name for logging
+        
+    Returns:
+        Modified worksheet with percentage formatting applied
+    """
+    from openpyxl.styles import numbers
+    
+    # Find all columns with '%' in the name
+    percentage_columns = [col for col in df.columns if '%' in str(col)]
+    
+    if not percentage_columns:
+        return worksheet
+    
+    # Get column indices (1-based for Excel)
+    column_indices = []
+    for pct_col in percentage_columns:
+        try:
+            col_idx = df.columns.get_loc(pct_col) + 1  # +1 because Excel is 1-indexed
+            column_indices.append((col_idx, pct_col))
+        except KeyError:
+            continue
+    
+    # Apply percentage formatting to these columns
+    for col_idx, col_name in column_indices:
+        # Get the Excel column letter
+        from openpyxl.utils import get_column_letter
+        col_letter = get_column_letter(col_idx)
+        
+        # Apply formatting to all cells in this column (skip header row)
+        for row in range(2, worksheet.max_row + 1):
+            cell = worksheet[f'{col_letter}{row}']
+            if cell.value is not None and isinstance(cell.value, (int, float)):
+                # Apply percentage format: 0.5 → 50.0%, 1 → 100.0%
+                cell.number_format = '0.0%'
+    
+    return worksheet
+
 
 app = FastAPI(
     title="Sales Route Optimizer API",
