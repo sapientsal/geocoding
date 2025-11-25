@@ -6,7 +6,7 @@ import unittest
 import re
 
 # Get backend URL from frontend/.env
-BACKEND_URL = "https://f235ba44-72f5-4259-bbd8-67b1b9d8e1d9.preview.emergentagent.com/api"
+BACKEND_URL = "https://salespath-5.preview.emergentagent.com/api"
 
 class TestGermanAddressFormatCleaning(unittest.TestCase):
     """Test the German address format cleaning logic"""

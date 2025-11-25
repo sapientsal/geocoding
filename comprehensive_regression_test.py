@@ -10,7 +10,7 @@ import requests
 import time
 import json
 
-BACKEND_URL = "https://f235ba44-72f5-4259-bbd8-67b1b9d8e1d9.preview.emergentagent.com/api"
+BACKEND_URL = "https://salespath-5.preview.emergentagent.com/api"
 
 def log_test(message, success=True):
     """Log test results"""
