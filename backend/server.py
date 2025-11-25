@@ -257,6 +257,7 @@ def sort_addresses_by_street_and_house_number(df, geocoded_data):
     street_col = None
     house_num_col = None
     ort_col = None
+    teilort_col = None
     
     for col in working_df.columns:
         col_lower = col.lower().strip()
@@ -264,11 +265,18 @@ def sort_addresses_by_street_and_house_number(df, geocoded_data):
             street_col = col
         elif any(keyword in col_lower for keyword in ['hausnummer', 'haus nummer', 'haus-nummer']) or (col_lower == 'nummer' or col_lower == 'nr' or col_lower == 'hnr'):
             house_num_col = col
-        elif any(keyword in col_lower for keyword in ['ort', 'stadt', 'city', 'location']):
+        elif any(keyword in col_lower for keyword in ['ort', 'stadt', 'city', 'location']) and 'teil' not in col_lower:
+            # Only match "Ort" columns, not "Teilort"
             ort_col = col
         elif any(keyword in col_lower for keyword in ['teilort', 'stadtteil', 'ortsteil', 'district']):
-            # Teilort has higher priority than Ort for better local grouping
-            ort_col = col
+            # Keep Teilort separate for potential future use
+            teilort_col = col
+    
+    # CRITICAL FIX: For geocoding, prefer "Ort" (main city) over "Teilort" (sub-locality)
+    # "Teilort" alone often fails geocoding (e.g., "Aligse" without "Lehrte")
+    # Use "Ort" if available, otherwise fall back to "Teilort"
+    if not ort_col and teilort_col:
+        ort_col = teilort_col
     
     if not street_col or not house_num_col:
         print("Warning: Could not detect street and house number columns for sorting")
