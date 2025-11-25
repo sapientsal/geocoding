@@ -55,6 +55,31 @@ def clean_numeric_string(value) -> str:
     # For strings and other types, just convert to string
     return str(value).strip()
 
+def clean_dataframe_for_excel(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    CRITICAL FIX: Clean DataFrame before Excel export to prevent NaTType errors
+    
+    Problem: NaT (Not a Time) datetime values cause "NaTType does not support utcoffset" error
+    when writing to Excel via pandas.to_excel()
+    
+    Solution: Replace all NaT values in datetime columns with None before export
+    
+    Args:
+        df: DataFrame to clean
+        
+    Returns:
+        Cleaned DataFrame with NaT values replaced by None
+    """
+    df_clean = df.copy()
+    
+    # Clean datetime columns
+    for col in df_clean.columns:
+        if pd.api.types.is_datetime64_any_dtype(df_clean[col]):
+            # Replace NaT with None (which Excel can handle)
+            df_clean[col] = df_clean[col].apply(lambda x: None if pd.isna(x) else x)
+    
+    return df_clean
+
 
 app = FastAPI(
     title="Sales Route Optimizer API",
