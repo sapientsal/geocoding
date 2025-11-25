@@ -2866,6 +2866,13 @@ async def export_street_sorted_route(job_id: str):
         
         df = pd.DataFrame(rows)
         
+        # CRITICAL FIX: Clean NaT (Not a Time) values before Excel export
+        # NaT values cause "NaTType does not support utcoffset" error
+        for col in df.columns:
+            if pd.api.types.is_datetime64_any_dtype(df[col]):
+                # Replace NaT with None (which Excel can handle)
+                df[col] = df[col].apply(lambda x: None if pd.isna(x) else x)
+        
         # Create Excel file with enhanced formatting
         output = BytesIO()
         with pd.ExcelWriter(output, engine='openpyxl') as writer:
