@@ -2241,10 +2241,12 @@ async def process_street_sorted_job(job_id: str, file_content: bytes, filename: 
             original_idx = idx
             geocoded_info = geocoded_data[original_idx] if original_idx < len(geocoded_data) else {}
             
-            # Convert any NaN or infinity values to None for JSON serialization
+            # Convert any NaN, infinity, or NaT values to None for JSON/MongoDB serialization
             row_dict = {}
             for k, v in row.to_dict().items():
                 if isinstance(v, float) and (pd.isna(v) or math.isinf(v)):
+                    row_dict[k] = None
+                elif pd.isna(v):  # CRITICAL FIX: Handle NaT and other pd.NA values
                     row_dict[k] = None
                 else:
                     row_dict[k] = v
