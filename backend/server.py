@@ -3505,6 +3505,7 @@ async def export_failed_addresses(job_id: str):
                     })
                 
                 logs_df = pd.DataFrame(logs_df_data)
+                logs_df = clean_dataframe_for_excel(logs_df)
                 logs_df.to_excel(writer, sheet_name='Error Logs', index=False)
         
         output.seek(0)
