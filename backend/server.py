@@ -3490,6 +3490,7 @@ async def export_failed_addresses(job_id: str):
                 stats_data.append([category, info['count']])
             
             stats_df = pd.DataFrame(stats_data, columns=['Metric', 'Value'])
+            stats_df = clean_dataframe_for_excel(stats_df)
             stats_df.to_excel(writer, sheet_name='Statistics', index=False)
             
             # Error Logs Sheet
