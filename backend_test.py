@@ -2513,6 +2513,12 @@ def run_all_tests():
     # Skip health check as it's not implemented
     print("\n🔍 Skipping health check endpoint (not implemented)")
     
+    # HIGHEST PRIORITY: Test CRITICAL GEOCODING FIX for Penliste Lehrte 1 DGN.xlsx
+    print("\n" + "=" * 80)
+    print("🚨 CRITICAL: Testing GEOCODING FIX for Penliste Lehrte 1 DGN.xlsx")
+    print("=" * 80)
+    critical_geocoding_job_id = test_critical_geocoding_fix_lehrte()
+    
     # CRITICAL PRIORITY: Test Column Detection Fix for House Number Identification
     print("\n" + "=" * 80)
     print("🚨 CRITICAL: Testing Column Detection Fix for House Number Identification")
