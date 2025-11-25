@@ -2814,6 +2814,7 @@ async def export_optimized_route(job_id: str):
             }
             
             summary_df = pd.DataFrame(summary_data)
+            summary_df = clean_dataframe_for_excel(summary_df)
             summary_df.to_excel(writer, sheet_name='Zusammenfassung', index=False)
             
             # Style summary sheet
@@ -2940,6 +2941,7 @@ async def export_street_sorted_route(job_id: str):
             }
             
             summary_df = pd.DataFrame(summary_data)
+            summary_df = clean_dataframe_for_excel(summary_df)
             summary_df.to_excel(writer, sheet_name='Zusammenfassung', index=False)
             
             # Style summary sheet
