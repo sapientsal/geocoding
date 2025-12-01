@@ -369,7 +369,7 @@ def sort_addresses_by_street_and_house_number(df, geocoded_data):
         col_lower = col.lower().strip()
         if any(keyword in col_lower for keyword in ['projektname strasse', 'strasse', 'straße', 'street']):
             street_col = col
-        elif any(keyword in col_lower for keyword in ['hausnummer', 'haus nummer', 'haus-nummer']) or (col_lower == 'nummer' or col_lower == 'nr' or col_lower == 'hnr'):
+        elif any(keyword in col_lower for keyword in ['hausnummer', 'haus nummer', 'haus-nummer']) or (col_lower == 'nummer' or col_lower == 'nr' or col_lower == 'nr.' or col_lower == 'hnr'):
             house_num_col = col
         elif any(keyword in col_lower for keyword in ['ort', 'stadt', 'city', 'location']) and 'teil' not in col_lower:
             # Only match "Ort" columns, not "Teilort"
@@ -619,7 +619,7 @@ def optimize_geographic_route(df, geocoded_data, addresses_to_geocode):
         col_lower = col.lower().strip()
         if any(keyword in col_lower for keyword in ['projektname strasse', 'strasse', 'straße', 'street']):
             street_col = col
-        elif any(keyword in col_lower for keyword in ['hausnummer', 'haus nummer', 'haus-nummer']) or (col_lower == 'nummer' or col_lower == 'nr' or col_lower == 'hnr'):
+        elif any(keyword in col_lower for keyword in ['hausnummer', 'haus nummer', 'haus-nummer']) or (col_lower == 'nummer' or col_lower == 'nr' or col_lower == 'nr.' or col_lower == 'hnr'):
             house_num_col = col
         elif any(keyword in col_lower for keyword in ['ort', 'stadt', 'city', 'location']) and 'teil' not in col_lower:
             # Only match "Ort" columns, not "Teilort"
