@@ -976,6 +976,97 @@ def validate_and_clean_german_address(address: str) -> dict:
             
             # Try to extract city (word after PLZ)
             city_match = re.search(rf'{plz}\s+([A-Za-zäöüÄÖÜß\-]+)', address_clean)
+
+def validate_geocoding_result(address: str, lat: float, lon: float, prev_address: dict = None) -> dict:
+    """
+    CRITICAL FIX: Validate geocoding results to detect false positives
+    
+    Checks:
+    1. If two consecutive addresses are on the same street but >500m apart → suspicious
+    2. Returns validation status and recommendation for re-try
+    
+    Args:
+        address: Current address string
+        lat: Latitude of geocoded result
+        lon: Longitude of geocoded result
+        prev_address: Previous address dict with 'address', 'lat', 'lon', 'street'
+        
+    Returns:
+        dict with 'is_valid', 'confidence', 'warning', 'should_retry'
+    """
+    try:
+        if not prev_address or not lat or not lon:
+            return {
+                'is_valid': True,
+                'confidence': 'medium',
+                'warning': None,
+                'should_retry': False
+            }
+        
+        # Extract street name from current address
+        import re
+        current_street = None
+        # Try to extract street name (word before number or before comma)
+        street_match = re.search(r'^([A-Za-zäöüÄÖÜß\s\-]+)', address.split(',')[0])
+        if street_match:
+            current_street = street_match.group(1).strip()
+        
+        prev_street = prev_address.get('street', '')
+        prev_lat = prev_address.get('lat')
+        prev_lon = prev_address.get('lon')
+        
+        # If same street name, check distance
+        if current_street and prev_street and prev_lat and prev_lon:
+            # Normalize street names for comparison
+            current_street_norm = current_street.lower().replace('strasse', 'straße').strip()
+            prev_street_norm = prev_street.lower().replace('strasse', 'straße').strip()
+            
+            if current_street_norm == prev_street_norm:
+                # Calculate distance using Haversine formula
+                from math import radians, cos, sin, asin, sqrt
+                
+                lon1, lat1, lon2, lat2 = map(radians, [prev_lon, prev_lat, lon, lat])
+                dlon = lon2 - lon1
+                dlat = lat2 - lat1
+                a = sin(dlat/2)**2 + cos(lat1) * cos(lat2) * sin(dlon/2)**2
+                c = 2 * asin(sqrt(a))
+                distance_m = 6371000 * c  # Earth radius in meters
+                
+                # If same street but >500m apart → highly suspicious
+                if distance_m > 500:
+                    return {
+                        'is_valid': False,
+                        'confidence': 'low',
+                        'warning': f'Same street but {distance_m:.0f}m apart - likely geocoding error',
+                        'should_retry': True,
+                        'distance': distance_m
+                    }
+                
+                # If between 200-500m → moderately suspicious
+                elif distance_m > 200:
+                    return {
+                        'is_valid': True,
+                        'confidence': 'medium',
+                        'warning': f'Same street, {distance_m:.0f}m apart - please verify',
+                        'should_retry': False,
+                        'distance': distance_m
+                    }
+        
+        return {
+            'is_valid': True,
+            'confidence': 'high',
+            'warning': None,
+            'should_retry': False
+        }
+        
+    except Exception as e:
+        return {
+            'is_valid': True,
+            'confidence': 'unknown',
+            'warning': f'Validation error: {str(e)}',
+            'should_retry': False
+        }
+
             if city_match:
                 city = city_match.group(1)
                 
