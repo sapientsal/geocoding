@@ -976,6 +976,28 @@ def validate_and_clean_german_address(address: str) -> dict:
             
             # Try to extract city (word after PLZ)
             city_match = re.search(rf'{plz}\s+([A-Za-zäöüÄÖÜß\-]+)', address_clean)
+            if city_match:
+                city = city_match.group(1)
+                
+                # Extract street and house number (everything before PLZ)
+                street_part = address_clean.split(',')[0].strip()
+                
+                # Reformat: "Street, City, PLZ, Germany"
+                # This format helps OSM better identify the correct location
+                address_clean = f"{street_part}, {city}, {plz}, Germany"
+        
+        return {
+            'is_valid': True,
+            'cleaned_address': address_clean,
+            'error': None
+        }
+        
+    except Exception as e:
+        return {
+            'is_valid': False,
+            'cleaned_address': address,
+            'error': f'Validation error: {str(e)}'
+        }
 
 def validate_geocoding_result(address: str, lat: float, lon: float, prev_address: dict = None) -> dict:
     """
