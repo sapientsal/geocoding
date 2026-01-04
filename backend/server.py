@@ -919,6 +919,7 @@ def calculate_distance_meters(lat1: float, lon1: float, lat2: float, lon2: float
 def validate_and_clean_german_address(address: str) -> dict:
     """
     Validate and clean German address format for better geocoding results
+    CRITICAL FIX: Reformat address to prioritize PLZ for better geocoding accuracy
     """
     try:
         # Basic validation
@@ -963,6 +964,27 @@ def validate_and_clean_german_address(address: str) -> dict:
         
         for old, new in replacements.items():
             address_clean = address_clean.replace(old, new)
+        
+        # CRITICAL FIX: Reformat to prioritize PLZ
+        # Parse address components and reorder: "Street Number, City, PLZ, Germany"
+        import re
+        
+        # Try to extract PLZ (5-digit German postal code)
+        plz_match = re.search(r'\b(\d{5})\b', address_clean)
+        if plz_match:
+            plz = plz_match.group(1)
+            
+            # Try to extract city (word after PLZ)
+            city_match = re.search(rf'{plz}\s+([A-Za-zäöüÄÖÜß\-]+)', address_clean)
+            if city_match:
+                city = city_match.group(1)
+                
+                # Extract street and house number (everything before PLZ)
+                street_part = address_clean.split(',')[0].strip()
+                
+                # Reformat: "Street, City, PLZ, Germany"
+                # This format helps OSM better identify the correct location
+                address_clean = f"{street_part}, {city}, {plz}, Germany"
         
         return {
             'is_valid': True,
