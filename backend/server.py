@@ -1050,6 +1050,7 @@ async def geocode_address_with_cache(address: str, job_logger: JobLogger = None)
                 ) as session:
                     
                     # Use Nominatim API with German locale preference
+                    # CRITICAL FIX: Enhanced geocoding with PLZ prioritization and bounding box
                     url = "https://nominatim.openstreetmap.org/search"
                     params = {
                         'q': address_clean,
@@ -1058,7 +1059,10 @@ async def geocode_address_with_cache(address: str, job_logger: JobLogger = None)
                         'countrycodes': 'de',  # Restrict to Germany for better results
                         'addressdetails': 1,
                         'extratags': 1,
-                        'accept-language': 'de,en'
+                        'accept-language': 'de,en',
+                        # Add bounding box for Germany to prevent results from other countries
+                        'viewbox': '5.8663153,47.2701114,15.0419319,55.099161',  # Germany boundaries
+                        'bounded': 1  # Strict: only results within viewbox
                     }
                     
                     if job_logger:
