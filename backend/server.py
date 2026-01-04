@@ -1089,29 +1089,6 @@ def validate_geocoding_result(address: str, lat: float, lon: float, prev_address
             'should_retry': False
         }
 
-            if city_match:
-                city = city_match.group(1)
-                
-                # Extract street and house number (everything before PLZ)
-                street_part = address_clean.split(',')[0].strip()
-                
-                # Reformat: "Street, City, PLZ, Germany"
-                # This format helps OSM better identify the correct location
-                address_clean = f"{street_part}, {city}, {plz}, Germany"
-        
-        return {
-            'is_valid': True,
-            'cleaned_address': address_clean,
-            'error': None
-        }
-        
-    except Exception as e:
-        return {
-            'is_valid': False,
-            'cleaned_address': address,
-            'error': f'Validation error: {str(e)}'
-        }
-
 async def geocode_address_with_cache(address: str, job_logger: JobLogger = None) -> dict:
     """
     Ultra-robust geocoding with comprehensive monitoring and error handling
