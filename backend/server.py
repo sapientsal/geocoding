@@ -137,10 +137,43 @@ app = FastAPI(
     version="1.0.0"
 )
 
+
+@app.on_event("startup")
+async def on_startup():
+    """On startup, mark any orphaned in-progress jobs as errored (server was killed mid-run)."""
+    try:
+        upload_jobs_collection.update_many(
+            {"status": {"$in": ["parsing", "geocoding", "sorting", "optimizing"]}},
+            {"$set": {
+                "status": "error",
+                "error_message": "Server wurde neu gestartet – Job abgebrochen. Bitte Datei erneut hochladen."
+            }}
+        )
+        print("✅ Startup: Orphaned jobs cleaned up")
+    except Exception as e:
+        print(f"⚠️ Startup cleanup failed: {e}")
+
 # Global variables for caching and monitoring
 address_cache = {}
 active_jobs = {}
 job_logs = {}
+
+# Multi-API geocoding configuration
+LOCATIONIQ_KEY = os.environ.get('LOCATIONIQ_KEY', '')
+GEOAPIFY_KEY = os.environ.get('GEOAPIFY_KEY', '')
+OPENCAGE_KEY = os.environ.get('OPENCAGE_KEY', '')
+
+# API health tracker: per-API cooldown (unix timestamp until which it's blocked)
+api_cooldown = {
+    'photon': 0,
+    'locationiq': 0,
+    'geoapify': 0,
+    'opencage': 0,
+    'nominatim': 0,
+}
+
+# Job singleton lock: only one geocoding job runs at a time
+_geocoding_job_lock = asyncio.Lock()
 
 class JobLogger:
     """Centralized logging for jobs with frontend visibility"""
@@ -1089,225 +1122,198 @@ def validate_geocoding_result(address: str, lat: float, lon: float, prev_address
             'should_retry': False
         }
 
+# ---------------------------------------------------------------------------
+# Multi-API geocoding helpers
+# ---------------------------------------------------------------------------
+
+async def _try_photon(session: aiohttp.ClientSession, address: str) -> dict | None:
+    """Photon (Komoot) – free, no key, Germany-optimised."""
+    try:
+        url = "https://photon.komoot.io/api/"
+        params = {'q': address, 'limit': 1, 'lang': 'de'}
+        async with session.get(url, params=params, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+            if resp.status == 200:
+                data = await resp.json(content_type=None)
+                features = data.get('features', [])
+                if features:
+                    coords = features[0]['geometry']['coordinates']
+                    props = features[0].get('properties', {})
+                    parts = [
+                        props.get('name', ''),
+                        props.get('housenumber', ''),
+                        props.get('postcode', ''),
+                        props.get('city', '') or props.get('town', '') or props.get('village', '')
+                    ]
+                    formatted = ', '.join(p for p in parts if p)
+                    return {'latitude': coords[1], 'longitude': coords[0],
+                            'formatted_address': formatted or address,
+                            'geocoded': True, 'source': 'photon'}
+            elif resp.status == 429:
+                api_cooldown['photon'] = time.time() + 120
+    except Exception:
+        pass
+    return None
+
+
+async def _try_locationiq(session: aiohttp.ClientSession, address: str) -> dict | None:
+    """LocationIQ – 5 000 req/day free."""
+    if not LOCATIONIQ_KEY:
+        return None
+    try:
+        url = "https://us1.locationiq.com/v1/search"
+        params = {'key': LOCATIONIQ_KEY, 'q': address, 'format': 'json',
+                  'limit': 1, 'countrycodes': 'de', 'accept-language': 'de'}
+        async with session.get(url, params=params, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+            if resp.status == 200:
+                data = await resp.json(content_type=None)
+                if data:
+                    r = data[0]
+                    return {'latitude': float(r['lat']), 'longitude': float(r['lon']),
+                            'formatted_address': r.get('display_name', address),
+                            'geocoded': True, 'source': 'locationiq'}
+            elif resp.status == 429:
+                api_cooldown['locationiq'] = time.time() + 120
+    except Exception:
+        pass
+    return None
+
+
+async def _try_geoapify(session: aiohttp.ClientSession, address: str) -> dict | None:
+    """Geoapify – 3 000 req/day free."""
+    if not GEOAPIFY_KEY:
+        return None
+    try:
+        url = "https://api.geoapify.com/v1/geocode/search"
+        params = {'text': address, 'filter': 'countrycode:de',
+                  'format': 'json', 'apiKey': GEOAPIFY_KEY, 'limit': 1, 'lang': 'de'}
+        async with session.get(url, params=params, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+            if resp.status == 200:
+                data = await resp.json(content_type=None)
+                results = data.get('results', [])
+                if results:
+                    r = results[0]
+                    return {'latitude': r['lat'], 'longitude': r['lon'],
+                            'formatted_address': r.get('formatted', address),
+                            'geocoded': True, 'source': 'geoapify'}
+            elif resp.status == 429:
+                api_cooldown['geoapify'] = time.time() + 120
+    except Exception:
+        pass
+    return None
+
+
+async def _try_opencage(session: aiohttp.ClientSession, address: str) -> dict | None:
+    """OpenCage – 2 500 req/day free."""
+    if not OPENCAGE_KEY:
+        return None
+    try:
+        url = "https://api.opencagedata.com/geocode/v1/json"
+        params = {'q': address, 'key': OPENCAGE_KEY, 'countrycode': 'de',
+                  'limit': 1, 'language': 'de', 'no_annotations': 1}
+        async with session.get(url, params=params, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+            if resp.status == 200:
+                data = await resp.json(content_type=None)
+                results = data.get('results', [])
+                if results:
+                    g = results[0].get('geometry', {})
+                    return {'latitude': g['lat'], 'longitude': g['lng'],
+                            'formatted_address': results[0].get('formatted', address),
+                            'geocoded': True, 'source': 'opencage'}
+            elif resp.status == 429:
+                api_cooldown['opencage'] = time.time() + 120
+    except Exception:
+        pass
+    return None
+
+
+async def _try_nominatim(session: aiohttp.ClientSession, address: str) -> dict | None:
+    """Nominatim (OSM) – last resort."""
+    try:
+        url = "https://nominatim.openstreetmap.org/search"
+        params = {'q': address, 'format': 'json', 'limit': 1,
+                  'countrycodes': 'de', 'addressdetails': 1,
+                  'accept-language': 'de,en',
+                  'viewbox': '5.8663153,47.2701114,15.0419319,55.099161',
+                  'bounded': 1}
+        headers = {'User-Agent': 'SalesRouteOptimizer/2.0'}
+        async with session.get(url, params=params, headers=headers,
+                               timeout=aiohttp.ClientTimeout(total=15)) as resp:
+            if resp.status == 200:
+                data = await resp.json(content_type=None)
+                if data:
+                    r = data[0]
+                    return {'latitude': float(r['lat']), 'longitude': float(r['lon']),
+                            'formatted_address': r.get('display_name', address),
+                            'street': r.get('address', {}).get('road', ''),
+                            'geocoded': True, 'source': 'nominatim'}
+            elif resp.status == 429:
+                api_cooldown['nominatim'] = time.time() + 120
+    except Exception:
+        pass
+    return None
+
+
 async def geocode_address_with_cache(address: str, job_logger: JobLogger = None) -> dict:
     """
-    Ultra-robust geocoding with comprehensive monitoring and error handling
+    Multi-API geocoding: Photon → LocationIQ → Geoapify → OpenCage → Nominatim.
+    Immediately skips any API on cooldown (429). No long waits.
     """
-    try:
-        # Check cache first
-        if address in address_cache:
-            cached_result = address_cache[address]
-            if job_logger and not cached_result.get('geocoded', False):
-                job_logger.log('INFO', f'Address retrieved from cache (failed): {cached_result.get("error", "Unknown error")}', address=address)
-            return cached_result
-        
-        # Enhanced address cleaning and validation for German addresses
-        address_clean = address.strip()
-        if not address_clean:
-            error_result = {
-                'latitude': None,
-                'longitude': None,
-                'formatted_address': address,
-                'geocoded': False,
-                'error': 'Empty address'
-            }
-            if job_logger:
-                job_logger.log('WARNING', 'Empty address provided for geocoding', address=address)
-            return error_result
-        
-        # Pre-validate and clean German address format
-        validation_result = validate_and_clean_german_address(address_clean)
-        if not validation_result['is_valid']:
-            error_result = {
-                'latitude': None,
-                'longitude': None,
-                'formatted_address': address,
-                'geocoded': False,
-                'error': f'Invalid address format: {validation_result["error"]}'
-            }
-            if job_logger:
-                job_logger.log('WARNING', f'Invalid address format: {validation_result["error"]}', address=address)
-            address_cache[address] = error_result
-            return error_result
-        
-        # Use the cleaned address for geocoding
-        address_clean = validation_result['cleaned_address']
-        if job_logger:
-            job_logger.log('INFO', f'Address cleaned and validated successfully', address=f'{address} -> {address_clean}')
-        
-        # Enhanced retry logic with comprehensive error handling
-        max_retries = 7  # Increased retries
-        base_delay = 0.5
-        timeout = 45  # Increased timeout
-        
-        for attempt in range(max_retries):
+    # ── Cache check ──────────────────────────────────────────────────────────
+    if address in address_cache:
+        return address_cache[address]
+
+    address_clean = address.strip()
+    if not address_clean:
+        return {'latitude': None, 'longitude': None,
+                'formatted_address': address, 'geocoded': False, 'error': 'Empty address'}
+
+    # Use cleaned address from validator if valid
+    validation = validate_and_clean_german_address(address_clean)
+    if validation['is_valid']:
+        address_clean = validation['cleaned_address']
+
+    if job_logger:
+        job_logger.log('INFO', f'Geocoding: {address_clean}', address=address_clean)
+
+    # ── API cascade ───────────────────────────────────────────────────────────
+    now = time.time()
+    apis = [
+        ('photon',    lambda s: _try_photon(s, address_clean)),
+        ('locationiq', lambda s: _try_locationiq(s, address_clean)),
+        ('geoapify',  lambda s: _try_geoapify(s, address_clean)),
+        ('opencage',  lambda s: _try_opencage(s, address_clean)),
+        ('nominatim', lambda s: _try_nominatim(s, address_clean)),
+    ]
+
+    connector = aiohttp.TCPConnector(limit=10, ttl_dns_cache=300, use_dns_cache=True)
+    async with aiohttp.ClientSession(connector=connector) as session:
+        for api_name, api_fn in apis:
+            if api_cooldown.get(api_name, 0) > now:
+                if job_logger:
+                    job_logger.log('INFO', f'{api_name} on cooldown, skipping', address=address_clean)
+                continue
             try:
-                # Create session with enhanced configuration
-                timeout_obj = aiohttp.ClientTimeout(
-                    total=timeout, 
-                    connect=15,
-                    sock_read=30
-                )
-                connector = aiohttp.TCPConnector(
-                    limit=100,
-                    limit_per_host=30,
-                    ttl_dns_cache=300,
-                    use_dns_cache=True,
-                )
-                
-                async with aiohttp.ClientSession(
-                    timeout=timeout_obj,
-                    connector=connector,
-                    headers={'User-Agent': 'Sales Route Optimizer v1.0'}
-                ) as session:
-                    
-                    # Use Nominatim API with German locale preference
-                    # CRITICAL FIX: Enhanced geocoding with PLZ prioritization and bounding box
-                    url = "https://nominatim.openstreetmap.org/search"
-                    params = {
-                        'q': address_clean,
-                        'format': 'json',
-                        'limit': 1,
-                        'countrycodes': 'de',  # Restrict to Germany for better results
-                        'addressdetails': 1,
-                        'extratags': 1,
-                        'accept-language': 'de,en',
-                        # Add bounding box for Germany to prevent results from other countries
-                        'viewbox': '5.8663153,47.2701114,15.0419319,55.099161',  # Germany boundaries
-                        'bounded': 1  # Strict: only results within viewbox
-                    }
-                    
+                result = await api_fn(session)
+                if result:
                     if job_logger:
-                        job_logger.log('INFO', f'Geocoding attempt {attempt + 1}/{max_retries}', address=address_clean)
-                    
-                    async with session.get(url, params=params) as response:
-                        if response.status == 200:
-                            data = await response.json()
-                            
-                            if data and len(data) > 0:
-                                result = data[0]
-                                geocoded_result = {
-                                    'latitude': float(result['lat']),
-                                    'longitude': float(result['lon']),
-                                    'formatted_address': result.get('display_name', address),
-                                    'street': result.get('address', {}).get('road', ''),
-                                    'city': result.get('address', {}).get('city', ''),
-                                    'country': result.get('address', {}).get('country', ''),
-                                    'geocoded': True
-                                }
-                                
-                                if job_logger:
-                                    job_logger.log('INFO', f'Geocoding successful: {result.get("display_name", "Unknown location")}', address=address)
-                                
-                                # Cache successful results
-                                address_cache[address] = geocoded_result
-                                return geocoded_result
-                            else:
-                                empty_result = {
-                                    'latitude': None,
-                                    'longitude': None,
-                                    'formatted_address': address,
-                                    'geocoded': False,
-                                    'error': 'No results found from geocoding service'
-                                }
-                                
-                                if job_logger:
-                                    job_logger.log('WARNING', 'No geocoding results found from OpenStreetMap', address=address_clean)
-                                
-                                address_cache[address] = empty_result
-                                return empty_result
-                        
-                        elif response.status == 429:
-                            # Rate limited - use exponential backoff WITH CAP
-                            # CRITICAL FIX: Cap delay BEFORE logging and sleeping
-                            raw_delay = base_delay * (4 ** attempt)
-                            delay = min(raw_delay, 60)  # Cap at 60 seconds maximum
-                            if job_logger:
-                                job_logger.log('WARNING', f'Rate limited (429), waiting {delay:.1f}s before retry {attempt + 1}', address=address_clean)
-                            await asyncio.sleep(delay)
-                            continue
-                        
-                        elif response.status >= 500:
-                            # Server error - retry with backoff
-                            delay = base_delay * (2 ** attempt)
-                            if job_logger:
-                                job_logger.log('WARNING', f'Server error {response.status}, waiting {delay:.1f}s before retry {attempt + 1}', address=address_clean)
-                            await asyncio.sleep(min(delay, 30))
-                            continue
-                        
-                        else:
-                            if attempt == max_retries - 1:
-                                error_msg = f"HTTP {response.status} error after all retries"
-                                if job_logger:
-                                    job_logger.log('CRITICAL', error_msg, address=address_clean)
-                                raise Exception(error_msg)
-                            
-                            delay = base_delay * (2 ** attempt)
-                            if job_logger:
-                                job_logger.log('WARNING', f'HTTP {response.status} error, waiting {delay:.1f}s before retry {attempt + 1}', address=address_clean)
-                            await asyncio.sleep(min(delay, 20))
-                            continue
-                            
-            except asyncio.TimeoutError:
-                if attempt == max_retries - 1:
-                    if job_logger:
-                        job_logger.log('CRITICAL', f'Geocoding timeout after {max_retries} attempts', address=address_clean)
-                    break
-                
-                delay = base_delay * (3 ** attempt)
+                        job_logger.log('INFO',
+                            f'Geocoded via {api_name}: {result.get("formatted_address", "")}',
+                            address=address_clean)
+                    address_cache[address] = result
+                    return result
+                # API returned nothing (not found) – try next without penalty
+            except Exception as exc:
                 if job_logger:
-                    job_logger.log('WARNING', f'Timeout error, waiting {delay:.1f}s before retry {attempt + 1}', address=address_clean)
-                await asyncio.sleep(min(delay, 30))
-                continue
-                
-            except aiohttp.ClientError as e:
-                if attempt == max_retries - 1:
-                    if job_logger:
-                        job_logger.log('CRITICAL', f'Client error after {max_retries} attempts: {str(e)}', address=address_clean)
-                    break
-                
-                delay = base_delay * (2 ** attempt)
-                if job_logger:
-                    job_logger.log('WARNING', f'Client error, waiting {delay:.1f}s before retry {attempt + 1}', address=address_clean)
-                await asyncio.sleep(min(delay, 20))
-                continue
-                
-            except Exception as e:
-                if attempt == max_retries - 1:
-                    if job_logger:
-                        job_logger.log('CRITICAL', f'Unexpected error after {max_retries} attempts: {str(e)}', address=address_clean)
-                    break
-                
-                delay = base_delay * (2 ** attempt)
-                if job_logger:
-                    job_logger.log('WARNING', f'Unexpected error, waiting {delay:.1f}s before retry {attempt + 1}', address=address_clean)
-                await asyncio.sleep(min(delay, 15))
-                continue
-        
-        # If all retries failed
-        empty_result = {
-            'latitude': None,
-            'longitude': None,
-            'formatted_address': address,
-            'geocoded': False,
-            'error': f'Failed after {max_retries} attempts - service unavailable'
-        }
-        if job_logger:
-            job_logger.log('CRITICAL', f'All geocoding attempts failed for address', address=address_clean)
-        address_cache[address] = empty_result
-        return empty_result
-        
-    except Exception as e:
-        error_msg = f"Critical geocoding error: {str(e)[:200]}"
-        if job_logger:
-            job_logger.log('CRITICAL', f'Critical geocoding error: {str(e)[:200]}', address=address)
-        return {
-            'latitude': None,
-            'longitude': None,
-            'formatted_address': address,
-            'geocoded': False,
-            'error': error_msg
-        }
+                    job_logger.log('WARNING', f'{api_name} error: {exc}', address=address_clean)
+
+    # ── All APIs exhausted ────────────────────────────────────────────────────
+    fail = {'latitude': None, 'longitude': None,
+            'formatted_address': address, 'geocoded': False,
+            'error': 'All geocoding APIs failed or returned no result'}
+    if job_logger:
+        job_logger.log('WARNING', 'All APIs failed', address=address_clean)
+    address_cache[address] = fail
+    return fail
 
 def geocode_address_cached(address: str) -> tuple:
     """Geocode an address with caching for performance"""
@@ -2060,6 +2066,12 @@ async def preview_file(file: UploadFile = File(...)):
 
 async def process_street_sorted_job(job_id: str, file_content: bytes, filename: str):
     """Background task to process uploaded file with street-based sorting"""
+    async with _geocoding_job_lock:
+        await _process_street_sorted_job_inner(job_id, file_content, filename)
+
+
+async def _process_street_sorted_job_inner(job_id: str, file_content: bytes, filename: str):
+    """Inner implementation (called under job lock)"""
     try:
         # Update job status
         upload_jobs_collection.update_one(
@@ -2219,8 +2231,8 @@ async def process_street_sorted_job(job_id: str, file_content: bytes, filename: 
                     }}
                 )
                 
-                # Rate limiting
-                await asyncio.sleep(0.5)  # Increased delay for better success rate
+                # Small polite delay between addresses
+                await asyncio.sleep(0.1)
                 
             except Exception as e:
                 print(f"Geocoding error for address {address}: {e}")
@@ -2553,6 +2565,12 @@ async def process_geographic_optimization_job(job_id: str, file_content: bytes, 
     - Calculates exact distances
     - Preserves all original columns
     """
+    async with _geocoding_job_lock:
+        await _process_geographic_optimization_job_inner(job_id, file_content, filename)
+
+
+async def _process_geographic_optimization_job_inner(job_id: str, file_content: bytes, filename: str):
+    """Inner implementation (called under job lock)"""
     try:
         # Update job status
         upload_jobs_collection.update_one(
@@ -2707,16 +2725,8 @@ async def process_geographic_optimization_job(job_id: str, file_content: bytes, 
                             }}
                         )
                     
-                    # Enhanced rate limiting with adaptive delays
-                    if failed_count > 5 and (failed_count / max(i + 1, 1)) > 0.5:
-                        # If failure rate is high, slow down
-                        await asyncio.sleep(1.0)
-                    elif geocoded_count > 0 and (geocoded_count / max(i + 1, 1)) > 0.8:
-                        # If success rate is high, speed up a bit
-                        await asyncio.sleep(0.2)
-                    else:
-                        # Normal rate
-                        await asyncio.sleep(0.4)
+                    # Small polite delay between addresses (multi-API handles rate limits)
+                    await asyncio.sleep(0.1)
                     
                     # Memory management: Clear cache periodically for very large datasets
                     if i > 0 and i % 1000 == 0:

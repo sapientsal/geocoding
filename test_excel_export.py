@@ -7,7 +7,7 @@ import os
 import time
 
 # Get backend URL from frontend/.env
-BACKEND_URL = "https://salespath-5.preview.emergentagent.com/api"
+BACKEND_URL = "https://nominatim-overload.preview.emergentagent.com/api"
 
 def test_excel_export():
     """Test Excel export functionality to verify system-generated columns are filtered out"""

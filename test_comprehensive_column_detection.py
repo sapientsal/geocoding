@@ -9,7 +9,7 @@ import pandas as pd
 from datetime import datetime
 
 # Get backend URL from frontend/.env
-BACKEND_URL = "https://salespath-5.preview.emergentagent.com/api"
+BACKEND_URL = "https://nominatim-overload.preview.emergentagent.com/api"
 
 def log_test(task, message, success=True):
     """Log test results"""

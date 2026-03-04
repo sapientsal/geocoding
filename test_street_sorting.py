@@ -8,7 +8,7 @@ import json
 from datetime import datetime
 
 # Get backend URL from frontend/.env
-BACKEND_URL = "https://salespath-5.preview.emergentagent.com/api"
+BACKEND_URL = "https://nominatim-overload.preview.emergentagent.com/api"
 
 def test_street_based_sorting():
     """Test street-based sorting with specific test cases"""

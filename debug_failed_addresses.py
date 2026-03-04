@@ -12,7 +12,7 @@ addresses_collection = db['addresses']
 routes_collection = db['routes']
 upload_jobs_collection = db['upload_jobs']
 
-BACKEND_URL = "https://salespath-5.preview.emergentagent.com/api"
+BACKEND_URL = "https://nominatim-overload.preview.emergentagent.com/api"
 
 def debug_helmstedt_job():
     """Debug the Helmstedt job data structure"""

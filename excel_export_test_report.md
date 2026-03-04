@@ -7,7 +7,7 @@ To verify that the Excel export functionality meets the following requirements:
 3. The "distance_to_next_m" column is present and contains correct distance values in meters
 
 ## Test Environment
-- Backend URL: https://salespath-5.preview.emergentagent.com/api
+- Backend URL: https://nominatim-overload.preview.emergentagent.com/api
 - Endpoint tested: /api/optimized/{job_id}/export
 
 ## Test Results

@@ -5,7 +5,7 @@ import json
 import sys
 
 # Get backend URL from frontend/.env
-BACKEND_URL = "https://salespath-5.preview.emergentagent.com/api"
+BACKEND_URL = "https://nominatim-overload.preview.emergentagent.com/api"
 
 def test_marker_filtering():
     """Test marker filtering optimization"""

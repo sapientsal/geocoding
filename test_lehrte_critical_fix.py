@@ -7,7 +7,7 @@ import requests
 import time
 import pandas as pd
 
-BACKEND_URL = "https://salespath-5.preview.emergentagent.com/api"
+BACKEND_URL = "https://nominatim-overload.preview.emergentagent.com/api"
 
 def test_critical_geocoding_fix():
     """Test the critical geocoding fix with Lehrte sample data"""

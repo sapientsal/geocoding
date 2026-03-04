@@ -11,7 +11,7 @@ import random
 import sys
 
 # Get backend URL from frontend/.env
-BACKEND_URL = "https://salespath-5.preview.emergentagent.com/api"
+BACKEND_URL = "https://nominatim-overload.preview.emergentagent.com/api"
 
 def create_large_dataset(num_addresses=2000):
     """Create a large dataset with the specified number of addresses"""
