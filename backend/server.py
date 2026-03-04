@@ -1218,11 +1218,13 @@ async def geocode_address_with_cache(address: str, job_logger: JobLogger = None)
                                 return empty_result
                         
                         elif response.status == 429:
-                            # Rate limited - use exponential backoff
-                            delay = base_delay * (4 ** attempt)
+                            # Rate limited - use exponential backoff WITH CAP
+                            # CRITICAL FIX: Cap delay BEFORE logging and sleeping
+                            raw_delay = base_delay * (4 ** attempt)
+                            delay = min(raw_delay, 60)  # Cap at 60 seconds maximum
                             if job_logger:
                                 job_logger.log('WARNING', f'Rate limited (429), waiting {delay:.1f}s before retry {attempt + 1}', address=address_clean)
-                            await asyncio.sleep(min(delay, 60))  # Cap at 60 seconds
+                            await asyncio.sleep(delay)
                             continue
                         
                         elif response.status >= 500:
