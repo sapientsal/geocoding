@@ -1,69 +1,52 @@
-# Sales Route Optimizer – PRD
+# PRD – Sales Route Optimizer
 
 ## Original Problem Statement
-Web tool for sales route optimization. Users upload Excel files with German addresses (various formats), the system geocodes them, sorts by street or optimizes geographically, and exports results as Excel.
+Full-stack Tool für Vertriebs-Routenoptimierung: Excel-Adresslisten hochladen, Adressen geocodieren (Multi-API-Kaskade ohne Rate-Limits), geografisch/straßenbasiert sortieren, "Restpotenzial" berechnen, Ergebnis als Excel exportieren.
 
-**Critical recurring issue**: OpenStreetMap (Nominatim) rate-limiting made geocoding unusably slow (~20 addresses in 30 minutes).
+## Architektur
+- Frontend: React (`/app/frontend/src/App.js`)
+- Backend: FastAPI Monolith (`/app/backend/server.py`, ~3900 Zeilen), MongoDB
+- Geocoding: Photon (Haupt-API, unlimitiert, sequenziell ~1 req/s) → LocationIQ → Geoapify → OpenCage → Nominatim (Keys in backend/.env)
+- Routing: Hierarchischer Nearest-Neighbor (Ortsteil → Straße → Hausnummer), Haversine-Distanzen
 
-## Architecture
-```
-/app/
-├── backend/server.py      # Monolithic FastAPI server (all logic)
-├── frontend/src/App.js    # React frontend
-└── memory/PRD.md
-```
+## ⚠️ WICHTIGER VORFALL (23./24.07.2026)
+Die Umgebung wurde auf den Stand von ~04.03.2026 zurückgesetzt (Rollback). Alle Arbeit von März–Juli ging verloren und wurde am 24.07. NEU IMPLEMENTIERT (siehe unten). Alte DB-Jobs (Haldensleben, Heilbad Heiligenstadt) sind weg.
 
-**Stack**: FastAPI + React + MongoDB + aiohttp + pandas + openpyxl
+## 2026-07-24: Wiederaufbau nach Rollback (getestet, E2E verifiziert)
+1. **Haldensleben/SDU-Spaltenerkennung** (additiv in allen 6 Erkennungsschleifen):
+   - `NUMBER` (exakt) → Hausnummer; `AFFIX` → Zusatz; `MUNICIPALITY` → Ort; `DISTRICT` → Teilort/OT
+   - `STREET_NAME` wird über bestehendes 'street'-Keyword erkannt
+2. **Hierarchische Sortierung** in `optimize_geographic_route`:
+   - Level 1: Straßengruppen nach Ortsteil (teilort_col, Fallback ort_col) bucketen
+   - Level 2: OT-Reihenfolge per Nearest-Neighbor ab NÖRDLICHSTEM OT
+   - Level 3: Straßen im OT per Nearest-Neighbor ab nördlichster Straße
+   - Level 4: Hausnummern numerisch (bestehend)
+3. **Bugfix Straßen-Präfix** (alle clean_street_name-Varianten + Geocoding-Adressbau):
+   - Erstes Wort wird NUR entfernt, wenn es Ziffern enthält (Projekt-Codes wie "624"), NIE deutsche Wörter ("Vor", "Hinter", "Am", "Alte") → verhindert Vermischen von "Vor dem Dorfe"/"Hinter dem Dorfe"
+4. **Bugfix Gruppierungsschlüssel**: `street_city_key` = "Straße, OT, Stadt" wenn OT vorhanden (sonst wie bisher "Straße, Stadt") → gleiche Straßennamen in verschiedenen OTs (Lange Straße in Uthmöden vs. Haldensleben) bleiben getrennt
+- Tests: `/app/backend/tests/test_rebuild.py` (4/4 bestanden) + E2E-Upload via API (Format erkannt, 6/6 geocodiert, OT-Reihenfolge korrekt, Export 200)
 
-## Key API Endpoints
-- `POST /api/upload` – upload Excel, start background job
-- `GET /api/jobs` – list all jobs
-- `GET /api/jobs/{id}` – job status/progress
-- `GET /api/export/street/{id}` – street-sorted Excel export
-- `GET /api/export/optimized/{id}` – geo-optimized Excel export
+## Unterstützte Excel-Formate
+1. Deutsche Glasfaser/Worpswede: `Projektname Strasse` (mit Code-Präfix "624 Worpswede X"), Hausnummer, PLZ, Ort
+2. Standard deutsch: Straße/Strasse, Hausnummer, Zusatz, PLZ, Ort, (Teilort/Ortsteil/Stadtteil/District → OT)
+3. Haldensleben SDU: STREET_NAME, NUMBER, NUMBER_AFFIX, PLZ, MUNICIPALITY, DISTRICT
+4. Single-Address-Spalte (Fallback)
 
-## DB Schema
-- `upload_jobs`: `{id, filename, status, created_at, progress, total_addresses}`
-- `geocoded_addresses_cache`: `{address_key, latitude, longitude, ...}`
+## Offene Punkte / Backlog
+### P0 – Nächste Schritte
+- [ ] **Ballenstedt SDU-Format** (Datei liegt vor: STADT, STREET_NAME, NUMBER, NUMBER_AFFIX, ORT, PLZ):
+  - `ORT` ist dort der ORTSTEIL, `STADT` die Gemeinde → Erkennungslogik: wenn STADT+ORT beide da, ORT als OT behandeln
+  - PLZ 4-stellig (6493) → führende Null auffüllen (06493, Sachsen-Anhalt), sonst Geocoding-Fehler
+- [ ] Gebiets-Kennzeichnung im Export (Spalte "Gebiet 1 – Uthmöden" etc.) – User-Diskussion lief, wartet auf Entscheidung:
+  - Option: große Kernstädte per Clustering in Tagespakete aufteilen (nach Adressen/WE/Restpotenzial)
+  - Option: ein Excel-Tab pro Gebiet
+### P1
+- [ ] Pre-Geocoding-Deduplizierung (gleiche Adresse nur 1x geocoden)
+- [ ] 2-opt Nachoptimierung / OSRM echte Fahrzeiten (Optionen B/C, User unentschieden)
+- [ ] Planstraßen-Filter (Platzhalter "Planstr. XXXXX" in separates Tab)
+### P2
+- [ ] server.py modularisieren, Pause/Resume, Kartenvisualisierung, CSV/GPX/KML-Export, User-Accounts
 
-## What's Been Implemented
-
-### Data Handling Fixes
-- `clean_numeric_string()` – prevents Excel floats (31275.0) from breaking geocoding
-- `clean_dataframe_for_excel()` – fixes NaT datetime export errors
-- `apply_percentage_formatting()` – preserves % column formatting in exported Excel
-- "nr." column detection – re-enabled support for Moormerland format
-
-### Geocoding System (2026-02-04 – MAJOR UPGRADE)
-- **Multi-API geocoding** (`geocode_address_with_cache`):
-  - API cascade: Photon (Komoot) → LocationIQ → Geoapify → OpenCage → Nominatim
-  - Per-API cooldown tracking – if one returns 429, immediately skip to next
-  - No more exponential backoff hangs
-  - Performance: ~0.7s/address (was: 30+ min for 20 addresses)
-- **Job singleton lock** (`_geocoding_job_lock`) – prevents parallel jobs from hammering APIs
-- **Startup cleanup** – orphaned "in-progress" jobs are marked as error on server restart
-
-### API Keys Configured
-- LocationIQ: 5,000 req/day free
-- Geoapify: 3,000 req/day free
-- OpenCage: 2,500 req/day free
-- Photon (Komoot): unlimited, no key needed
-
-## Prioritized Backlog
-
-### P0 – Complete
-- [x] Multi-API geocoding strategy
-- [x] Job singleton lock
-
-### P1 – Next
-- [ ] Intelligent deduplication: geocode each unique address only once per job
-- [ ] Pre-validation: report rows with missing PLZ/street before starting
-- [ ] Better progress indicator (show API source, ETA)
-
-### P2 – Future
-- [ ] Pause/resume jobs
-- [ ] Premium API option (Google Maps)
-- [ ] Self-hosted Nominatim
-- [ ] Modular architecture (split server.py)
-- [ ] User accounts + job history
-- [ ] CSV, GPX, KML export formats
+## Bekannte Datenanomalien
+- "Planstr. 1013562 1009" etc. = Platzhalter für geplante Straßen → Geocoding schlägt korrekt fehl, landen am Routenende
+- Utility-Skript-Idee: `reoptimize_job.py <job_id>` (Re-Sortierung ohne Re-Geocoding aus DB) – ging beim Rollback verloren, bei Bedarf neu erstellen

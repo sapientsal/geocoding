@@ -402,9 +402,9 @@ def sort_addresses_by_street_and_house_number(df, geocoded_data):
         col_lower = col.lower().strip()
         if any(keyword in col_lower for keyword in ['projektname strasse', 'strasse', 'straße', 'street']):
             street_col = col
-        elif any(keyword in col_lower for keyword in ['hausnummer', 'haus nummer', 'haus-nummer']) or (col_lower == 'nummer' or col_lower == 'nr' or col_lower == 'nr.' or col_lower == 'hnr'):
+        elif any(keyword in col_lower for keyword in ['hausnummer', 'haus nummer', 'haus-nummer']) or (col_lower == 'nummer' or col_lower == 'nr' or col_lower == 'nr.' or col_lower == 'hnr' or col_lower == 'number'):
             house_num_col = col
-        elif any(keyword in col_lower for keyword in ['ort', 'stadt', 'city', 'location']) and 'teil' not in col_lower:
+        elif any(keyword in col_lower for keyword in ['ort', 'stadt', 'city', 'location', 'municipality']) and 'teil' not in col_lower:
             # Only match "Ort" columns, not "Teilort"
             ort_col = col
         elif any(keyword in col_lower for keyword in ['teilort', 'stadtteil', 'ortsteil', 'district']):
@@ -477,9 +477,9 @@ def sort_addresses_by_street_and_house_number(df, geocoded_data):
             street = street[10:].strip()
         
         # Remove other short numeric/code prefixes (but be conservative)
-        # Only remove if it's a short code followed by space and actual street name
+        # Only strip codes containing digits – NEVER German words like "Vor", "Am", "Alte"
         parts = street.split()
-        if len(parts) > 1 and len(parts[0]) <= 4 and parts[0].isalnum():
+        if len(parts) > 1 and len(parts[0]) <= 4 and parts[0].isalnum() and any(c.isdigit() for c in parts[0]):
             # Check if the rest looks like a street name
             remaining = ' '.join(parts[1:])
             if any(char.isalpha() for char in remaining):
@@ -491,13 +491,17 @@ def sort_addresses_by_street_and_house_number(df, geocoded_data):
     
     # CRITICAL FIX: Create street_city_key for proper grouping
     # This ensures that same street names in different cities are treated as separate streets
+    # Include Ortsteil so identical street names in different Ortsteilen stay separate
     def create_street_city_key(row):
         street = str(row['street_clean']).strip()
         city = str(row.get(ort_col, '')).strip() if ort_col else ''
+        ot = str(row.get(teilort_col, '')).strip() if teilort_col else ''
         
         if street == '' or street == 'nan':
             return ''
         
+        if ot and ot.lower() not in ('', 'nan', 'null', 'none') and ot != city:
+            return f"{street}, {ot}, {city}" if city and city != 'nan' else f"{street}, {ot}"
         # Create unique key: "Straße, Stadt"
         if city and city != '' and city != 'nan':
             return f"{street}, {city}"
@@ -652,9 +656,9 @@ def optimize_geographic_route(df, geocoded_data, addresses_to_geocode):
         col_lower = col.lower().strip()
         if any(keyword in col_lower for keyword in ['projektname strasse', 'strasse', 'straße', 'street']):
             street_col = col
-        elif any(keyword in col_lower for keyword in ['hausnummer', 'haus nummer', 'haus-nummer']) or (col_lower == 'nummer' or col_lower == 'nr' or col_lower == 'nr.' or col_lower == 'hnr'):
+        elif any(keyword in col_lower for keyword in ['hausnummer', 'haus nummer', 'haus-nummer']) or (col_lower == 'nummer' or col_lower == 'nr' or col_lower == 'nr.' or col_lower == 'hnr' or col_lower == 'number'):
             house_num_col = col
-        elif any(keyword in col_lower for keyword in ['ort', 'stadt', 'city', 'location']) and 'teil' not in col_lower:
+        elif any(keyword in col_lower for keyword in ['ort', 'stadt', 'city', 'location', 'municipality']) and 'teil' not in col_lower:
             # Only match "Ort" columns, not "Teilort"
             ort_col = col
         elif any(keyword in col_lower for keyword in ['teilort', 'stadtteil', 'ortsteil', 'district']):
@@ -693,9 +697,6 @@ def optimize_geographic_route(df, geocoded_data, addresses_to_geocode):
                         street = ' '.join(parts[2:])
                     else:
                         street = remaining
-                elif parts[0].isalpha() and len(parts) >= 2:
-                    # If first part is alpha (like "Worpswede"), remove it
-                    street = ' '.join(parts[1:])
             
             # Additional cleanup for common prefixes
             if street.startswith('Worpswede '):
@@ -706,13 +707,17 @@ def optimize_geographic_route(df, geocoded_data, addresses_to_geocode):
         working_df['street_clean'] = working_df[street_col].apply(clean_street_name)
         
         # CRITICAL FIX: Create street_city_key for proper grouping
+        # Include Ortsteil so identical street names in different Ortsteilen stay separate
         def create_street_city_key(row):
             street = str(row['street_clean']).strip()
             city = str(row.get(ort_col, '')).strip() if ort_col else ''
+            ot = str(row.get(teilort_col, '')).strip() if teilort_col else ''
             
             if street == '' or street == 'nan':
                 return ''
             
+            if ot and ot.lower() not in ('', 'nan', 'null', 'none') and ot != city:
+                return f"{street}, {ot}, {city}" if city and city != 'nan' else f"{street}, {ot}"
             # Create unique key: "Straße, Stadt"
             if city and city != '' and city != 'nan':
                 return f"{street}, {city}"
@@ -791,35 +796,106 @@ def optimize_geographic_route(df, geocoded_data, addresses_to_geocode):
                 streets_without_coords.append((street_city_key, street_addresses))
                 print(f"Warning: Street+City '{street_city_key}' has no valid coordinates (all {len(street_addresses)} addresses failed), will be added at the end")
         
-        # Sort street groups by geographic proximity
+        # Sort street groups by HIERARCHICAL GEOGRAPHIC strategy:
+        #   Level 1: Group streets by Ortsteil (OT) — use Teilort/OT col, fallback to Stadt (ort_col)
+        #   Level 2: Order OTs via nearest-neighbor, starting from NORTHERNMOST OT
+        #   Level 3: Within each OT, order streets via nearest-neighbor, starting from NORTHERNMOST street
+        #   Level 4: Within each street, house numbers are already numerically sorted (preserved)
         if len(street_groups) > 1:
-            print(f"Optimizing route between {len(street_groups)} street groups...")
-            
-            # Start with first street
-            optimized_street_order = [street_groups[0]]
-            remaining_streets = street_groups[1:]
-            current_street = street_groups[0][0]
-            
-            # Use nearest neighbor to order streets
-            while remaining_streets:
-                current_center = street_centers[current_street]
-                
-                min_distance = float('inf')
-                next_street_idx = 0
-                
-                for i, (street_city_key, _) in enumerate(remaining_streets):
-                    street_center = street_centers[street_city_key]
-                    distance = calculate_distance_meters(
-                        current_center[0], current_center[1],
-                        street_center[0], street_center[1]
-                    )
-                    if distance < min_distance:
-                        min_distance = distance
-                        next_street_idx = i
-                
-                next_street = remaining_streets.pop(next_street_idx)
-                optimized_street_order.append(next_street)
-                current_street = next_street[0]
+            print(f"Hierarchical optimization: {len(street_groups)} streets across multiple Ortsteile/cities...")
+
+            # Helper: derive a stable "Ortsteil key" for a street group.
+            # Priority: teilort_col (OT) > ort_col (Stadt) > 'UNKNOWN'
+            def derive_ortsteil_key(street_addresses_df):
+                if teilort_col and teilort_col in street_addresses_df.columns:
+                    vals = street_addresses_df[teilort_col].dropna().astype(str).str.strip()
+                    vals = vals[(vals != '') & (vals.str.lower() != 'nan') & (vals.str.lower() != 'null')]
+                    if len(vals) > 0:
+                        return vals.mode().iloc[0]
+                if ort_col and ort_col in street_addresses_df.columns:
+                    vals = street_addresses_df[ort_col].dropna().astype(str).str.strip()
+                    vals = vals[(vals != '') & (vals.str.lower() != 'nan')]
+                    if len(vals) > 0:
+                        return vals.mode().iloc[0]
+                return 'UNKNOWN'
+
+            # Bucket streets by Ortsteil
+            ot_buckets = {}  # ot_key -> list of (street_city_key, street_addresses_df)
+            for street_city_key, street_addresses in street_groups:
+                ot_key = derive_ortsteil_key(street_addresses)
+                ot_buckets.setdefault(ot_key, []).append((street_city_key, street_addresses))
+
+            # Compute centroid per OT (average of valid street centers in that OT)
+            ot_centers = {}
+            for ot_key, streets in ot_buckets.items():
+                lats, lons = [], []
+                for sck, _ in streets:
+                    c = street_centers.get(sck)
+                    if c:
+                        lats.append(c[0])
+                        lons.append(c[1])
+                if lats:
+                    ot_centers[ot_key] = (sum(lats)/len(lats), sum(lons)/len(lons))
+
+            print(f"  → {len(ot_buckets)} Ortsteile/Städte: {sorted(ot_buckets.keys())[:10]}{'…' if len(ot_buckets) > 10 else ''}")
+
+            # --- Level 2: Order OTs starting from NORTHERNMOST ---
+            ot_keys_with_center = [k for k in ot_buckets.keys() if k in ot_centers]
+            ot_keys_without = [k for k in ot_buckets.keys() if k not in ot_centers]
+
+            if ot_keys_with_center:
+                # Northernmost = highest latitude
+                start_ot = max(ot_keys_with_center, key=lambda k: ot_centers[k][0])
+                print(f"  → Start-Ortsteil (nördlichster): '{start_ot}' @ {ot_centers[start_ot]}")
+
+                ot_order = [start_ot]
+                remaining_ots = [k for k in ot_keys_with_center if k != start_ot]
+                current = start_ot
+                while remaining_ots:
+                    cur_lat, cur_lon = ot_centers[current]
+                    best_idx, best_dist = 0, float('inf')
+                    for i, k in enumerate(remaining_ots):
+                        lat, lon = ot_centers[k]
+                        d = calculate_distance_meters(cur_lat, cur_lon, lat, lon)
+                        if d is not None and d < best_dist:
+                            best_dist = d
+                            best_idx = i
+                    current = remaining_ots.pop(best_idx)
+                    ot_order.append(current)
+                # OTs without any centroid go at the end
+                ot_order.extend(ot_keys_without)
+            else:
+                ot_order = list(ot_buckets.keys())
+
+            # --- Level 3: Within each OT, order streets starting from NORTHERNMOST street ---
+            optimized_street_order = []
+            for ot_key in ot_order:
+                streets_in_ot = ot_buckets[ot_key]
+                with_c = [(sck, sdf) for sck, sdf in streets_in_ot if sck in street_centers]
+                without_c = [(sck, sdf) for sck, sdf in streets_in_ot if sck not in street_centers]
+
+                if not with_c:
+                    optimized_street_order.extend(streets_in_ot)
+                    continue
+
+                # Northernmost street in this OT as start
+                start_idx = max(range(len(with_c)), key=lambda i: street_centers[with_c[i][0]][0])
+                ordered = [with_c.pop(start_idx)]
+                print(f"    OT '{ot_key}': {len(with_c) + 1} Straßen (Start: '{ordered[0][0]}')")
+
+                while with_c:
+                    cur_lat, cur_lon = street_centers[ordered[-1][0]]
+                    best_idx, best_dist = 0, float('inf')
+                    for i, (sck, _) in enumerate(with_c):
+                        lat, lon = street_centers[sck]
+                        d = calculate_distance_meters(cur_lat, cur_lon, lat, lon)
+                        if d is not None and d < best_dist:
+                            best_dist = d
+                            best_idx = i
+                    ordered.append(with_c.pop(best_idx))
+
+                ordered.extend(without_c)
+                optimized_street_order.extend(ordered)
             
             # Rebuild the dataframe in optimized street order
             optimized_parts = []
@@ -1753,13 +1829,13 @@ async def process_upload_job(job_id: str, file_content: bytes, filename: str):
             col_lower = col.lower().strip()
             if any(keyword in col_lower for keyword in ['projektname strasse', 'strasse', 'straße', 'street']):
                 street_col = col
-            elif any(keyword in col_lower for keyword in ['hausnummer', 'haus nummer', 'haus-nummer']) or (col_lower == 'nummer' or col_lower == 'nr' or col_lower == 'nr.' or col_lower == 'hnr'):
+            elif any(keyword in col_lower for keyword in ['hausnummer', 'haus nummer', 'haus-nummer']) or (col_lower == 'nummer' or col_lower == 'nr' or col_lower == 'nr.' or col_lower == 'hnr' or col_lower == 'number'):
                 house_num_col = col
-            elif any(keyword in col_lower for keyword in ['zusatz', 'zusätze']):
+            elif any(keyword in col_lower for keyword in ['zusatz', 'zusätze', 'affix']):
                 zusatz_col = col
             elif any(keyword in col_lower for keyword in ['plz', 'postleitzahl', 'postal']):
                 plz_col = col
-            elif any(keyword in col_lower for keyword in ['ort', 'stadt', 'city', 'location']) and 'teil' not in col_lower:
+            elif any(keyword in col_lower for keyword in ['ort', 'stadt', 'city', 'location', 'municipality']) and 'teil' not in col_lower:
                 # Only match "Ort" columns, not "Teilort"
                 ort_col = col
             elif any(keyword in col_lower for keyword in ['teilort', 'stadtteil', 'ortsteil', 'district']):
@@ -1978,13 +2054,13 @@ async def preview_file(file: UploadFile = File(...)):
             col_lower = col.lower().strip()
             if any(keyword in col_lower for keyword in ['projektname strasse', 'strasse', 'straße', 'street']):
                 street_col = col
-            elif any(keyword in col_lower for keyword in ['hausnummer', 'haus nummer', 'haus-nummer']) or (col_lower == 'nummer' or col_lower == 'nr' or col_lower == 'nr.' or col_lower == 'hnr'):
+            elif any(keyword in col_lower for keyword in ['hausnummer', 'haus nummer', 'haus-nummer']) or (col_lower == 'nummer' or col_lower == 'nr' or col_lower == 'nr.' or col_lower == 'hnr' or col_lower == 'number'):
                 house_num_col = col
-            elif any(keyword in col_lower for keyword in ['zusatz', 'zusätze']):
+            elif any(keyword in col_lower for keyword in ['zusatz', 'zusätze', 'affix']):
                 zusatz_col = col
             elif any(keyword in col_lower for keyword in ['plz', 'postleitzahl', 'postal']):
                 plz_col = col
-            elif any(keyword in col_lower for keyword in ['ort', 'stadt', 'city', 'location']) and 'teil' not in col_lower:
+            elif any(keyword in col_lower for keyword in ['ort', 'stadt', 'city', 'location', 'municipality']) and 'teil' not in col_lower:
                 # Only match "Ort" columns, not "Teilort"
                 ort_col = col
             elif any(keyword in col_lower for keyword in ['teilort', 'stadtteil', 'ortsteil', 'district']):
@@ -2111,13 +2187,13 @@ async def _process_street_sorted_job_inner(job_id: str, file_content: bytes, fil
             col_lower = col.lower().strip()
             if any(keyword in col_lower for keyword in ['projektname strasse', 'strasse', 'straße', 'street']):
                 street_col = col
-            elif any(keyword in col_lower for keyword in ['hausnummer', 'haus nummer', 'haus-nummer']) or (col_lower == 'nummer' or col_lower == 'nr' or col_lower == 'nr.' or col_lower == 'hnr'):
+            elif any(keyword in col_lower for keyword in ['hausnummer', 'haus nummer', 'haus-nummer']) or (col_lower == 'nummer' or col_lower == 'nr' or col_lower == 'nr.' or col_lower == 'hnr' or col_lower == 'number'):
                 house_num_col = col
-            elif any(keyword in col_lower for keyword in ['zusatz', 'zusätze']):
+            elif any(keyword in col_lower for keyword in ['zusatz', 'zusätze', 'affix']):
                 zusatz_col = col
             elif any(keyword in col_lower for keyword in ['plz', 'postleitzahl', 'postal']):
                 plz_col = col
-            elif any(keyword in col_lower for keyword in ['ort', 'stadt', 'city', 'location']) and 'teil' not in col_lower:
+            elif any(keyword in col_lower for keyword in ['ort', 'stadt', 'city', 'location', 'municipality']) and 'teil' not in col_lower:
                 # Only match "Ort" columns, not "Teilort"
                 ort_col = col
             elif any(keyword in col_lower for keyword in ['teilort', 'stadtteil', 'ortsteil', 'district']):
@@ -2147,7 +2223,7 @@ async def _process_street_sorted_job_inner(job_id: str, file_content: bytes, fil
                 elif ' ' in street and len(street.split()[0]) < 4:
                     # Remove short prefixes that might be project codes
                     parts = street.split()
-                    if parts[0].isalnum() and len(parts) > 1:
+                    if parts[0].isalnum() and any(c.isdigit() for c in parts[0]) and len(parts) > 1:
                         street = ' '.join(parts[1:])
                 
                 # Combine address parts
@@ -2274,8 +2350,9 @@ async def _process_street_sorted_job_inner(job_id: str, file_content: bytes, fil
                     street = street[10:].strip()
                 
                 # Remove other short numeric/code prefixes
+                # Only strip codes containing digits – NEVER German words like "Vor", "Am", "Alte"
                 parts = street.split()
-                if len(parts) > 1 and len(parts[0]) <= 4 and parts[0].isalnum():
+                if len(parts) > 1 and len(parts[0]) <= 4 and parts[0].isalnum() and any(c.isdigit() for c in parts[0]):
                     # Check if the rest looks like a street name
                     remaining = ' '.join(parts[1:])
                     if any(char.isalpha() for char in remaining):
@@ -2286,13 +2363,17 @@ async def _process_street_sorted_job_inner(job_id: str, file_content: bytes, fil
             working_df['street_clean'] = working_df[street_col].apply(clean_street_name)
             
             # CRITICAL FIX: Create street_city_key for proper grouping
+            # Include Ortsteil so identical street names in different Ortsteilen stay separate
             def create_street_city_key(row):
                 street = str(row['street_clean']).strip()
                 city = str(row.get(ort_col, '')).strip() if ort_col else ''
+                ot = str(row.get(teilort_col, '')).strip() if teilort_col else ''
                 
                 if street == '' or street == 'nan':
                     return ''
                 
+                if ot and ot.lower() not in ('', 'nan', 'null', 'none') and ot != city:
+                    return f"{street}, {ot}, {city}" if city and city != 'nan' else f"{street}, {ot}"
                 # Create unique key: "Straße, Stadt"
                 if city and city != '' and city != 'nan':
                     return f"{street}, {city}"
@@ -2610,13 +2691,13 @@ async def _process_geographic_optimization_job_inner(job_id: str, file_content: 
             col_lower = col.lower().strip()
             if any(keyword in col_lower for keyword in ['projektname strasse', 'strasse', 'straße', 'street']):
                 street_col = col
-            elif any(keyword in col_lower for keyword in ['hausnummer', 'haus nummer', 'haus-nummer']) or (col_lower == 'nummer' or col_lower == 'nr' or col_lower == 'nr.' or col_lower == 'hnr'):
+            elif any(keyword in col_lower for keyword in ['hausnummer', 'haus nummer', 'haus-nummer']) or (col_lower == 'nummer' or col_lower == 'nr' or col_lower == 'nr.' or col_lower == 'hnr' or col_lower == 'number'):
                 house_num_col = col
-            elif any(keyword in col_lower for keyword in ['zusatz', 'zusätze']):
+            elif any(keyword in col_lower for keyword in ['zusatz', 'zusätze', 'affix']):
                 zusatz_col = col
             elif any(keyword in col_lower for keyword in ['plz', 'postleitzahl', 'postal']):
                 plz_col = col
-            elif any(keyword in col_lower for keyword in ['ort', 'stadt', 'city', 'location']) and 'teil' not in col_lower:
+            elif any(keyword in col_lower for keyword in ['ort', 'stadt', 'city', 'location', 'municipality']) and 'teil' not in col_lower:
                 # Only match "Ort" columns, not "Teilort"
                 ort_col = col
             elif any(keyword in col_lower for keyword in ['teilort', 'stadtteil', 'ortsteil', 'district']):
@@ -2645,7 +2726,7 @@ async def _process_geographic_optimization_job_inner(job_id: str, file_content: 
                     street = street[10:].strip()
                 elif ' ' in street and len(street.split()[0]) < 4:
                     parts = street.split()
-                    if parts[0].isalnum() and len(parts) > 1:
+                    if parts[0].isalnum() and any(c.isdigit() for c in parts[0]) and len(parts) > 1:
                         street = ' '.join(parts[1:])
                 
                 # Combine address parts
