@@ -1,0 +1,24 @@
+{
+  "summary": "Independent verification after rollback rebuild. All 4 backend tasks passed. Unit tests (test_rebuild.py, 4/4) and new E2E tests (test_e2e_upload.py, 3/3) both green. Haldensleben SDU format detected correctly (STREET_NAME/NUMBER/NUMBER_AFFIX/DISTRICT/PLZ/MUNICIPALITY), hierarchical sort produces contiguous Ortsteil blocks starting with the northernmost (Uthmöden before Haldensleben), Lange Straße of different Ortsteile are not merged, house numbers ascending, and street_city_key contains the Ortsteil. Legacy German-column format (Straße/Hausnummer/PLZ/Ort, Worpswede) still processes and exports. Excel export endpoint /api/optimized/{job_id}/export returns HTTP 200 with all original columns preserved.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_rebuild.py",
+    "/app/backend/tests/test_e2e_upload.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py is 3925 lines — should be split into modules (routers, geocoding, optimization, column-detection). Column-detection block is duplicated 6x across the file; consolidate into a single helper.",
+    "Job status endpoint is /api/job/{job_id} (singular) while some request text mentioned /api/jobs/{job_id}; consider aliasing or documenting to avoid confusion."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_e2e_upload.py (new)"
+  ],
+  "success_rate": {"backend": "100%", "frontend": "n/a (skipped per request)"},
+  "seed_data_creation": "Two ephemeral upload jobs created via /api/upload-optimized (Haldensleben-format 6 addresses, Legacy Worpswede 4 addresses). Both cleaned up automatically from upload_jobs and routes collections via pytest module-scoped fixture. Real user job e3dbe9db-6710-48d5-9306-39b12841c24e untouched.",
+  "should_call_test_agent_after_fix": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "E2E tests live in /app/backend/tests/test_e2e_upload.py; they upload tiny XLSX files (<=6 rows) to /api/upload-optimized, poll /api/job/{job_id} until completed, verify Mongo 'routes' doc and /api/optimized/{job_id}/export. Cleanup fixture removes created docs. Geocoding runs ~1 addr/sec, so keep test files small. Job status endpoint is singular /api/job/{job_id}. Uthmöden lies north of Haldensleben, so any Haldensleben-format test file must place Uthmöden first in optimized order.",
+  "rca_of_the_issue": "No issues found. Rebuild is verified: (1) column-detection loop correctly maps STREET_NAME/NUMBER/NUMBER_AFFIX/DISTRICT/PLZ/MUNICIPALITY, (2) optimize_geographic_route groups by Ortsteil first (northernmost lat) then by street inside each OT, (3) clean_street_name only strips digit-containing prefixes so German prepositions Vor/Hinter survive, (4) street_city_key composite includes Ortsteil preventing cross-OT merging."
+}
