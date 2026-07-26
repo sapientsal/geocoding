@@ -25,6 +25,13 @@ Die Umgebung wurde auf den Stand von ~04.03.2026 zurückgesetzt (Rollback). Alle
    - Erstes Wort wird NUR entfernt, wenn es Ziffern enthält (Projekt-Codes wie "624"), NIE deutsche Wörter ("Vor", "Hinter", "Am", "Alte") → verhindert Vermischen von "Vor dem Dorfe"/"Hinter dem Dorfe"
 4. **Bugfix Gruppierungsschlüssel**: `street_city_key` = "Straße, OT, Stadt" wenn OT vorhanden (sonst wie bisher "Straße, Stadt") → gleiche Straßennamen in verschiedenen OTs (Lange Straße in Uthmöden vs. Haldensleben) bleiben getrennt
 - Tests: `/app/backend/tests/test_rebuild.py` (4/4 bestanden) + E2E-Upload via API (Format erkannt, 6/6 geocodiert, OT-Reihenfolge korrekt, Export 200)
+- **Testing-Agent-Verifikation (iteration_1.json): 100% pass** – zusätzlich `/app/backend/tests/test_e2e_upload.py` erstellt
+
+## 2026-07-26: Ballenstedt-Liste erfolgreich verarbeitet (OHNE Code-Änderung)
+- Job e3dbe9db: 2661/2682 geocodiert (99,2%), 6 OT-Blöcke (Asmusstedt→Radisleben→Ballenstedt→Opperode→Rieder→Badeborn), Start nördlichster OT
+- Erkenntnisse: `ORT`-Spalte (Dorf) gewinnt in Erkennungsschleife über `STADT` (letzter Treffer) → Geocoding + OT-Gruppierung funktionieren nativ; Photon toleriert 4-stellige PLZ (6493→06493)
+- 21 Fehler = "o.N."-Platzhalter (ohne Nummer) + exotische HNr ("901 W") → landen by design am Routenende
+- P0 "Ballenstedt-Format ergänzen" damit ERLEDIGT (keine Änderung nötig)
 
 ## Unterstützte Excel-Formate
 1. Deutsche Glasfaser/Worpswede: `Projektname Strasse` (mit Code-Präfix "624 Worpswede X"), Hausnummer, PLZ, Ort
