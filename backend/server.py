@@ -763,6 +763,48 @@ def optimize_geographic_route(df, geocoded_data, addresses_to_geocode):
             print(f"Error during street-based sorting: {e}")
             working_df_sorted = working_df
         
+        # ── Ausreißer-Korrektur: falsch geocodierte Einzeladressen zurückholen ──
+        # Eine Adresse >2 km vom Median ihrer Straße (oder >30 km vom Median der
+        # Gesamtliste) wurde von der Geocoding-API falsch zugeordnet und wird auf
+        # den Straßen-Median gesetzt, damit Route & Distanzen stimmen.
+        try:
+            valid_all = working_df_sorted.dropna(subset=['latitude', 'longitude'])
+            if len(valid_all) >= 3:
+                global_med_lat = valid_all['latitude'].median()
+                global_med_lon = valid_all['longitude'].median()
+                corrected = 0
+                for sck in working_df_sorted['street_city_key'].unique():
+                    if sck == '':
+                        continue
+                    mask = working_df_sorted['street_city_key'] == sck
+                    grp = working_df_sorted[mask].dropna(subset=['latitude', 'longitude'])
+                    if len(grp) == 0:
+                        continue
+                    med_lat = grp['latitude'].median()
+                    med_lon = grp['longitude'].median()
+                    for idx in grp.index:
+                        lat = working_df_sorted.at[idx, 'latitude']
+                        lon = working_df_sorted.at[idx, 'longitude']
+                        d_street = calculate_distance_meters(lat, lon, med_lat, med_lon)
+                        d_global = calculate_distance_meters(lat, lon, global_med_lat, global_med_lon)
+                        is_outlier = (len(grp) >= 3 and d_street is not None and d_street > 2000) or \
+                                     (d_global is not None and d_global > 30000)
+                        if is_outlier:
+                            # Ziel: Straßen-Median wenn plausibel, sonst globaler Median
+                            tgt_lat, tgt_lon = med_lat, med_lon
+                            d_med_global = calculate_distance_meters(med_lat, med_lon, global_med_lat, global_med_lon)
+                            if len(grp) < 3 or (d_med_global is not None and d_med_global > 30000):
+                                tgt_lat, tgt_lon = global_med_lat, global_med_lon
+                            working_df_sorted.at[idx, 'latitude'] = tgt_lat
+                            working_df_sorted.at[idx, 'longitude'] = tgt_lon
+                            working_df_sorted.at[idx, 'geocoding_error'] = 'Koordinate korrigiert: API-Treffer lag weit entfernt (Ausreißer)'
+                            corrected += 1
+                            print(f"  ⚠️ Ausreißer korrigiert: '{sck}' Index {idx} lag {round((d_street or d_global)/1000, 1)} km entfernt")
+                if corrected:
+                    print(f"⚠️ Ausreißer-Korrektur: {corrected} falsch geocodierte Adressen auf Straßen-Median gesetzt")
+        except Exception as e:
+            print(f"Outlier correction skipped: {e}")
+        
         # Now apply geographic optimization between street groups
         print("Applying geographic optimization between street groups...")
         
@@ -1223,6 +1265,7 @@ async def _try_photon(session: aiohttp.ClientSession, address: str) -> dict | No
                     formatted = ', '.join(p for p in parts if p)
                     return {'latitude': coords[1], 'longitude': coords[0],
                             'formatted_address': formatted or address,
+                            'postcode': str(props.get('postcode', '') or ''),
                             'geocoded': True, 'source': 'photon'}
             elif resp.status == 429:
                 api_cooldown['photon'] = time.time() + 120
@@ -1351,6 +1394,12 @@ async def geocode_address_with_cache(address: str, job_logger: JobLogger = None)
     if job_logger:
         job_logger.log('INFO', f'Geocoding: {address_clean}', address=address_clean)
 
+    # Erwartete PLZ aus der Anfrage extrahieren (Format: "Straße Nr, PLZ Ort")
+    expected_plz = None
+    plz_match = re.search(r',\s*(\d{4,5})\s+', address_clean + ' ')
+    if plz_match:
+        expected_plz = plz_match.group(1).zfill(5)
+
     # ── API cascade ───────────────────────────────────────────────────────────
     now = time.time()
     apis = [
@@ -1371,6 +1420,19 @@ async def geocode_address_with_cache(address: str, job_logger: JobLogger = None)
             try:
                 result = await api_fn(session)
                 if result:
+                    # PLZ-Plausibilitätsprüfung: Treffer in völlig falscher PLZ-Region verwerfen
+                    # (z.B. "Hauptstraße 99, 06493" → Treffer in 64390 Erzhausen = 269 km entfernt)
+                    if expected_plz:
+                        result_plz = str(result.get('postcode') or '')
+                        if not result_plz:
+                            m = re.search(r'\b(\d{5})\b', str(result.get('formatted_address', '')))
+                            result_plz = m.group(1) if m else ''
+                        if result_plz and result_plz.zfill(5)[:2] != expected_plz[:2]:
+                            if job_logger:
+                                job_logger.log('WARNING',
+                                    f'{api_name} Treffer verworfen: PLZ {result_plz} passt nicht zu erwarteter PLZ {expected_plz}',
+                                    address=address_clean)
+                            continue  # nächste API versuchen
                     if job_logger:
                         job_logger.log('INFO',
                             f'Geocoded via {api_name}: {result.get("formatted_address", "")}',

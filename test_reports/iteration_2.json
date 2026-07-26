@@ -1,0 +1,27 @@
+{
+  "summary": "Verified the Ballenstedt geocoding fix on 4 fronts. (1) Outlier-correction unit test: fed optimize_geographic_route 6 Schimmelgasse rows with one coordinate 250 km away; the outlier row was snapped within 1 km of the street median, its geocoding_error is 'Koordinate korrigiert: …', and every distance_to_next_m ≤ 5000 m. Sanity twin: 4 valid rows are NOT modified. (2) PLZ-validation live-API test: geocode_address_with_cache('Hauptstraße 99, 06493 Opperode') returned coords in the 06xxx band (51.7/11.2 area), not the known-bad Erzhausen coords. 'Schloßplatz 3, 06493 Ballenstedt' still geocodes correctly (~51.7/11.2), proving PLZ validation does not reject good hits. (3) Existing user job e3dbe9db-… inspected read-only: 0 distances >50 km, ≥80 optimized_addresses carry 'Koordinate korrigiert'. (4) Regression: /app/backend/tests/test_rebuild.py 4/4 pass and /app/backend/tests/test_e2e_upload.py 3/3 pass (Haldensleben hierarchical sort, export, Worpswede legacy format).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_geocoding_fixes.py",
+    "/app/backend/tests/test_e2e_upload.py",
+    "/app/backend/tests/test_rebuild.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py defines calculate_distance_meters twice (line 356 and line 1048) — one shadows the other. Not a bug for the fix but worth cleaning up.",
+    "PLZ plausibility check only compares first 2 digits of the postcode. For border cases inside the same 2-digit region this is fine, but it will not catch a wrong hit that happens to share the same PLZ prefix (rare in practice, still worth documenting).",
+    "Outlier-correction target defaults to street_median, then global_median. If a street group has ≥3 rows but the majority itself is wrong, the median could be the bad location. In current data this is a non-issue; consider majority-cluster detection long-term.",
+    "server.py is 3987 lines — repeated recommendation from iteration_1: split into modules."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_geocoding_fixes.py (new)"
+  ],
+  "success_rate": {"backend": "100% (12/12 tests: 5 new + 3 E2E + 4 unit)", "frontend": "n/a (skipped per request)"},
+  "seed_data_creation": "Two ephemeral upload jobs re-created via /api/upload-optimized inside test_e2e_upload.py (Haldensleben-6 + Worpswede-4), cleaned up by module-scoped fixture. Real user job e3dbe9db-6710-48d5-9306-39b12841c24e read-only inspection only, not modified.",
+  "should_call_test_agent_after_fix": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Fix verified end-to-end. New tests live in /app/backend/tests/test_geocoding_fixes.py: TestOutlierCorrection (unit, no network), TestPlzValidation (LIVE Photon calls – keep to ≤3 addresses per run to stay under Photon rate-limit), TestUserJobHealed (Mongo read-only on job_id e3dbe9db-6710-48d5-9306-39b12841c24e in 'routes' collection). server.address_cache is a module-level dict; TestPlzValidation pops keys before each call to force a real request. Full suite runtime ≈13 s.",
+  "rca_of_the_issue": "Original bug: Photon geocoded individual house numbers (e.g. 'Schimmelgasse 64, 06493 Opperode') to a look-alike street in a completely different PLZ (64832 Langstadt/Erzhausen), producing 256 km jumps. Fix works: (a) _try_photon now returns 'postcode' and geocode_address_with_cache rejects any result whose PLZ prefix (first 2 digits) does not match the PLZ in the query, forcing cascade to the next API; (b) optimize_geographic_route now snaps any coordinate >2 km from its street median (or >30 km from global median) back to the street/global median and flags it with 'Koordinate korrigiert'. Both layers verified independently."
+}
