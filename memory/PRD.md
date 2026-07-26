@@ -33,6 +33,14 @@ Die Umgebung wurde auf den Stand von ~04.03.2026 zurückgesetzt (Rollback). Alle
 - 21 Fehler = "o.N."-Platzhalter (ohne Nummer) + exotische HNr ("901 W") → landen by design am Routenende
 - P0 "Ballenstedt-Format ergänzen" damit ERLEDIGT (keine Änderung nötig)
 
+## 2026-07-26: BUGFIX Geocoding-Ausreißer (Testing-Agent verifiziert, 12/12 pass)
+- User-Bug: distance_to_next mit 256.000+ m mitten in derselben Straße (Schimmelgasse Opperode) – Photon matchte einzelne Hausnummern quer durch Deutschland (z.B. "Schimmelgasse 64, 06493" → "Schiemesgasse, 64832 Langstadt", 256 km; 86 Ausreißer in der Ballenstedt-Liste, max 6.456 km!)
+- Fix Layer 1: PLZ-Plausibilitätsprüfung in `geocode_address_with_cache` – erwartete PLZ aus Query (Regex nach Komma), Photon liefert jetzt `postcode`; Abgleich erste 2 Ziffern (zfill 5) → Mismatch = Treffer verwerfen, nächste API
+- Fix Layer 2: Ausreißer-Korrektur in `optimize_geographic_route` (nach Straßensortierung) – Adresse >2 km vom Straßen-Median (Gruppe ≥3) oder >30 km vom Global-Median → auf Straßen-Median gesnappt, geocoding_error='Koordinate korrigiert: ...'
+- Bestehender Ballenstedt-Job via `reoptimize_job.py` geheilt: 86 korrigiert, max Sprung jetzt 8,4 km, Gesamtdistanz 208,5 km
+- Neue Tests: `/app/backend/tests/test_geocoding_fixes.py` (Outlier-Unit, PLZ-Live, Job-Heilung)
+- Bekannte Grenzen (Review-Hinweise): PLZ-Check nur 2-stellig-Präfix; Median-Snapping versagt, falls Mehrheit einer Straße falsch läge (bisher nie beobachtet)
+
 ## Unterstützte Excel-Formate
 1. Deutsche Glasfaser/Worpswede: `Projektname Strasse` (mit Code-Präfix "624 Worpswede X"), Hausnummer, PLZ, Ort
 2. Standard deutsch: Straße/Strasse, Hausnummer, Zusatz, PLZ, Ort, (Teilort/Ortsteil/Stadtteil/District → OT)
