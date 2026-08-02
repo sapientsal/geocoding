@@ -41,6 +41,13 @@ Die Umgebung wurde auf den Stand von ~04.03.2026 zurückgesetzt (Rollback). Alle
 - Neue Tests: `/app/backend/tests/test_geocoding_fixes.py` (Outlier-Unit, PLZ-Live, Job-Heilung)
 - Bekannte Grenzen (Review-Hinweise): PLZ-Check nur 2-stellig-Präfix; Median-Snapping versagt, falls Mehrheit einer Straße falsch läge (bisher nie beobachtet)
 
+## 2026-08-02: BUGFIX Wolfsburg-Format `HSNR` nicht erkannt (Testing-Agent: 100% pass)
+- User-Bug: "0 Adressen" + "Hausnummer: Nicht erkannt" bei Wolfsburg_Neuland (Spalten STRASSE, HSNR, HSNR_ZUSATZ, PLZ, ORT + WH1-25 Status-Spalten)
+- Root Cause: exakte Hausnummer-Tokens ('nummer','nr','nr.','hnr','number') enthielten 'hsnr' nicht → Fallback Single-Address-Column → 0 Adressen
+- Fix: 'hsnr' + 'hausnr' in alle 6 Erkennungsschleifen (replace_all); HSNR_ZUSATZ mappt weiterhin korrekt auf zusatz
+- Verifiziert: Preview (222 Adressen erkannt), E2E-Upload inkl. Status-Spalten-Erhalt im Export, alle Regressions-Suites grün (test_hsnr_detection.py neu)
+- OFFEN: User-Entscheidung Trennzeilen-Handling (Option A Sektions-Erkennung / B eine Route / C manuell splitten) – User hat Trennzeilen manuell entfernt, Datei jetzt direkt verarbeitbar
+
 ## Unterstützte Excel-Formate
 1. Deutsche Glasfaser/Worpswede: `Projektname Strasse` (mit Code-Präfix "624 Worpswede X"), Hausnummer, PLZ, Ort
 2. Standard deutsch: Straße/Strasse, Hausnummer, Zusatz, PLZ, Ort, (Teilort/Ortsteil/Stadtteil/District → OT)
