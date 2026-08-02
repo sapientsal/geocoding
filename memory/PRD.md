@@ -63,6 +63,7 @@ Die Umgebung wurde auf den Stand von ~04.03.2026 zurückgesetzt (Rollback). Alle
   - Option: große Kernstädte per Clustering in Tagespakete aufteilen (nach Adressen/WE/Restpotenzial)
   - Option: ein Excel-Tab pro Gebiet
 ### P1
+- [ ] **Format-erhaltender Export** (User: "eventuell zukünftig", 02.08.26 zurückgestellt): Original-Workbook als Vorlage, Zeilen umsortieren statt neu schreiben → erhält Dropdowns (VP-/Status-Listen K:L, WH-Spalten), lebende Formeln (Restpoti `=X-COUNTIF(Nx:BJx,"Abschluss")` mit Zeilen-Translation) und Zellformatierung. Analyse liegt vor (Wolfsburg_Neuland).
 - [ ] Pre-Geocoding-Deduplizierung (gleiche Adresse nur 1x geocoden)
 - [ ] 2-opt Nachoptimierung / OSRM echte Fahrzeiten (Optionen B/C, User unentschieden)
 - [ ] Planstraßen-Filter (Platzhalter "Planstr. XXXXX" in separates Tab)
