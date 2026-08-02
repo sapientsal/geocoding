@@ -1,0 +1,23 @@
+{
+  "summary": "Backend-only test of the HSNR column-detection fix (Wolfsburg format) plus regression of all previously-passing suites. Built a 5-row xlsx mimicking Wolfsburg_Neuland_GEFILTERT (STRASSE, HSNR, HSNR_ZUSATZ, PLZ, ORT + WE/Restpoti/WH1) and verified: (1) POST /api/preview returns detected_format='German (separate columns)', detected_columns.house_number='HSNR', detected_columns.zusatz='HSNR_ZUSATZ', 5 preview addresses formatted as 'Am Finkenhaus 1, 38444 Wolfsburg'; (2) POST /api/upload-optimized -> /api/job/{id} polling -> job completed with 5/5 geocoded, route persisted in Mongo 'routes' collection, extra columns WE/Restpoti/WH1 preserved in row_data, GET /api/optimized/{id}/export returns 200 xlsx containing WH1 and Restpoti columns; (3) Regression: test_rebuild.py 4/4, test_geocoding_fixes.py 5/5, test_e2e_upload.py 3/3 — HSNR_ZUSATZ still correctly maps to zusatz (not house_number). Test jobs cleaned from upload_jobs and routes collections.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_hsnr_detection.py",
+    "/app/backend/tests/test_rebuild.py",
+    "/app/backend/tests/test_geocoding_fixes.py",
+    "/app/backend/tests/test_e2e_upload.py"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "The 6 identical column-detection loops in server.py (lines 405, 659, 1894, 2119, 2252, 2756) are pure duplication — any future keyword addition (like this hsnr fix) risks being applied to only a subset of loops. Extract into a single helper e.g. detect_columns(df.columns) returning a dict, and call it from all endpoints."
+  ],
+  "updated_files": ["/app/backend/tests/test_hsnr_detection.py"],
+  "success_rate": {"backend": "100%", "frontend": "N/A (skipped per request)"},
+  "seed_data_creation": "In-memory xlsx only (5 Wolfsburg addresses: Am Finkenhaus 1/3/4a, Hauptstraße 2/4, PLZ 38444). All created job_ids deleted from upload_jobs + routes after test run.",
+  "should_call_test_agent_after_fix": false,
+  "should_main_agent_self_test": false,
+  "test_credentials": "none required",
+  "context_for_next_testing_agent": "HSNR/HSNR_ZUSATZ detection is fully validated end-to-end (preview + upload + export). If future changes touch column-detection, prefer refactoring the 6 duplicated loops into one helper before adding more keywords. New regression test: /app/backend/tests/test_hsnr_detection.py (3 tests, ~5s, uses live Photon for 5 addresses).",
+  "rca_of_the_issue": "Original bug: exact-token match list for house number lacked 'hsnr'/'hausnr', so Wolfsburg's HSNR column was not detected, forcing fallback to single-address-column mode which yielded 0 rows. Fix (adding 'hsnr' and 'hausnr' to all 6 exact-match tuples) confirmed via preview (HSNR->house_number, HSNR_ZUSATZ->zusatz) and full E2E (5/5 geocoded, extras preserved through export). Regression suites remain green."
+}
