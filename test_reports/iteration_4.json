@@ -1,0 +1,34 @@
+{
+  "summary": "Verified the new Straßenmitte-Fallback-Interpolation block in server.optimize_geographic_route. 3 new unit/integration tests all pass (Test 1 interpolation of flagged fallbacks, Test 2 multi-unit safety, Test 3 healed real Kitzscher job). Regression: test_rebuild.py 4/4 pass, test_hsnr_detection.py + test_e2e_upload.py all green, but 1/8 in test_geocoding_fixes.py (test_single_outlier_snapped_to_street_median) now fails because the new interpolation block overwrites the 'Koordinate korrigiert' label on an outlier-snapped row.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "server.optimize_geographic_route (Straßenmitte-Fallback-Interpolation block, /app/backend/server.py lines 808-853)",
+        "issue": "Interpolation block runs AFTER outlier correction and can (a) overwrite the 'Koordinate korrigiert: API-Treffer lag weit entfernt (Ausreißer)' geocoding_error with 'Koordinate interpoliert: nur Straßenmitte gefunden', and (b) move the just-snapped point off the street median again. Reproduced in tests/test_geocoding_fixes.py::TestOutlierCorrection::test_single_outlier_snapped_to_street_median where the snapped Hausnr 64 lands on the median coord already used by Hausnr 60 → gets flagged as fallback and re-interpolated. Recommendation: in the fallback-detection loop, exclude indices whose geocoding_error already startswith 'Koordinate korrigiert' from both the coord_numbers accounting AND the flagged list. Alternatively snapshot-tag those rows before duplicate detection."
+      }
+    ]
+  },
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_street_center_interpolation.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "Make the new interpolation block skip rows already flagged by outlier correction ('Koordinate korrigiert' in geocoding_error). Currently the label is overwritten and the snapped coordinate is re-moved – see failing regression test test_geocoding_fixes.py::TestOutlierCorrection::test_single_outlier_snapped_to_street_median."
+  ],
+  "critical_code_review_comments": [
+    "server.optimize_geographic_route interpolation loop (lines 808-853) does not respect the earlier outlier-correction stamp; feed order coupling → adding a `if 'Koordinate korrigiert' in str(working_df_sorted.at[idx, 'geocoding_error']): continue` guard when building coord_numbers / flagged fixes the regression while preserving Kitzscher behaviour.",
+    "The interpolation writes 'Koordinate interpoliert: nur Straßenmitte gefunden' unconditionally; consider appending instead of replacing so multi-step corrections keep an audit trail."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_street_center_interpolation.py"
+  ],
+  "success_rate": {"backend": "93% (14/15 tests pass across new + regression suites)", "frontend": "n/a"},
+  "seed_data_creation": "None. Test 3 is read-only against existing Mongo doc job_id 990ecb84-8116-4219-9ece-0a9b29ba85d5.",
+  "should_call_test_agent_after_fix": true,
+  "should_main_agent_self_test": false,
+  "test_credentials": "None required",
+  "context_for_next_testing_agent": "New test file /app/backend/tests/test_street_center_interpolation.py covers all 3 fix cases. Once main agent guards the interpolation block against already-corrected rows, re-run: `cd /app/backend && pytest tests/test_street_center_interpolation.py tests/test_geocoding_fixes.py tests/test_hsnr_detection.py tests/test_e2e_upload.py -v` and `python3 tests/test_rebuild.py`. Kitzscher healed job in Mongo has 7 interpolated entries, max distance_to_next 2779 m, 6 unique DISTRICT blocks (Hainichen, Trages, Thierbach, Braußwig, Dittmannsdorf, Kitzscher). Do NOT modify real jobs.",
+  "rca_of_the_issue": "In test_single_outlier_snapped_to_street_median the outlier row (Hausnr 64) is snapped to the street median (51.720, 11.250). Because Hausnr 60 already sits at (51.720, 11.250), the new interpolation block now sees TWO distinct house_number_numeric values sharing the same rounded 6-decimal coord and treats it as a Straßenmitte-fallback, re-interpolating Hausnr 64 to the midpoint of Hausnr 63/65 and overwriting the 'Koordinate korrigiert' label. Fix: in the loop at server.py:820-833 skip indices whose geocoding_error already begins with 'Koordinate korrigiert' — they are trusted post-correction and must not be re-flagged."
+}

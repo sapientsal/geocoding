@@ -1,0 +1,21 @@
+{
+  "summary": "Fast follow-up backend regression after guard fix for 'Koordinate korrigiert' rows in Straßenmitte-Fallback-Interpolation. Ran full pytest suite (test_street_center_interpolation.py, test_geocoding_fixes.py, test_hsnr_detection.py, test_e2e_upload.py) and test_rebuild.py, plus read-only Kitzscher Mongo sanity check on job 990ecb84-8116-4219-9ece-0a9b29ba85d5. All 14 pytest tests + rebuild script passed. Previously failing test_single_outlier_snapped_to_street_median now passes: outlier row retains 'Koordinate korrigiert' and stays on street median. Kitzscher job still shows 7 'Koordinate interpoliert' entries, max distance_to_next=2779m (<=5000m), 6 contiguous DISTRICT blocks (Braußwig, Kitzscher, Hainichen, Thierbach, Dittmannsdorf, Trages) — unchanged by guard as expected.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_street_center_interpolation.py",
+    "/app/backend/tests/test_geocoding_fixes.py",
+    "/app/backend/tests/test_hsnr_detection.py",
+    "/app/backend/tests/test_e2e_upload.py",
+    "/app/backend/tests/test_rebuild.py"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (14/14 pytest + rebuild script)", "frontend": "not tested (backend-only)"},
+  "seed_data_creation": "None. Test uploads self-cleanup via test_zzz_cleanup.",
+  "should_call_test_agent_after_fix": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Guard for 'Koordinate korrigiert' rows in interpolation block is verified. Kitzscher job 990ecb84... untouched (correctly — job not re-run). If future edits touch optimize_geographic_route, re-run the same 4 pytest files + test_rebuild.py.",
+  "rca_of_the_issue": "Prior iteration_4 failure: interpolation block counted corrected rows in coord_numbers duplicate accounting and could re-flag/move them, overwriting 'Koordinate korrigiert' label. Fix adds two guards checking 'Koordinate korrigiert' in geocoding_error to skip accounting and to add row to trusted list. Verified with test_single_outlier_snapped_to_street_median now passing."
+}

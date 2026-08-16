@@ -48,6 +48,13 @@ Die Umgebung wurde auf den Stand von ~04.03.2026 zurückgesetzt (Rollback). Alle
 - Verifiziert: Preview (222 Adressen erkannt), E2E-Upload inkl. Status-Spalten-Erhalt im Export, alle Regressions-Suites grün (test_hsnr_detection.py neu)
 - OFFEN: User-Entscheidung Trennzeilen-Handling (Option A Sektions-Erkennung / B eine Route / C manuell splitten) – User hat Trennzeilen manuell entfernt, Datei jetzt direkt verarbeitbar
 
+## 2026-08-16: Straßenmitte-Fallback-Interpolation (Testing-Agent iteration_4+5: 100% pass)
+- User-Bug: große distance_to_next_m-Sprünge INNERHALB derselben Straße (Kitzscher: Landstraße Thierbach 29b→29 = 776 m Ping-Pong)
+- Root Cause: Photon liefert für unbekannte Hausnummern die Straßenmitte → mehrere verschiedene Hausnummern teilen sich exakt eine Koordinate weit weg von den echten Häusern
+- Fix: Interpolations-Block in `optimize_geographic_route` (nach Ausreißer-Korrektur): Koordinaten, die von ≥2 VERSCHIEDENEN house_number_numeric geteilt werden = Fallback → betroffene Zeilen auf Mittelwert der nächsten vertrauenswürdigen Hausnummern-Nachbarn gesetzt, geocoding_error='Koordinate interpoliert: nur Straßenmitte gefunden'. Gleiche-Hausnummer-Duplikate (Mehrfamilienhäuser) bleiben unberührt. Guard: bereits 'Koordinate korrigiert'-Zeilen gelten als vertrauenswürdig und werden nie re-interpoliert
+- Kitzscher-Job (990ecb84) geheilt: 7 interpoliert, 776m-Phantomsprung weg, verbleibende >400m-Sprünge = echte lange Dorfstraßen
+- Neue Tests: tests/test_street_center_interpolation.py; Gesamtsuite 14/14 + rebuild grün
+
 ## Unterstützte Excel-Formate
 1. Deutsche Glasfaser/Worpswede: `Projektname Strasse` (mit Code-Präfix "624 Worpswede X"), Hausnummer, PLZ, Ort
 2. Standard deutsch: Straße/Strasse, Hausnummer, Zusatz, PLZ, Ort, (Teilort/Ortsteil/Stadtteil/District → OT)

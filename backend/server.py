@@ -805,6 +805,59 @@ def optimize_geographic_route(df, geocoded_data, addresses_to_geocode):
         except Exception as e:
             print(f"Outlier correction skipped: {e}")
         
+        # ── Straßenmitte-Fallback-Interpolation ──
+        # Photon liefert für unbekannte Hausnummern nur die Straßenmitte. Solche
+        # Punkte (gleiche Koordinate für mehrere VERSCHIEDENE Hausnummern derselben
+        # Straße) werden zwischen ihre echten Hausnummern-Nachbarn interpoliert.
+        try:
+            interpolated = 0
+            for sck in working_df_sorted['street_city_key'].unique():
+                if sck == '':
+                    continue
+                mask = working_df_sorted['street_city_key'] == sck
+                grp = working_df_sorted[mask].dropna(subset=['latitude', 'longitude'])
+                if len(grp) < 3:
+                    continue
+                coord_numbers = {}
+                for idx in grp.index:
+                    # Bereits von der Ausreißer-Korrektur gesetzte Punkte sind vertrauenswürdig
+                    if 'Koordinate korrigiert' in str(working_df_sorted.at[idx, 'geocoding_error'] or ''):
+                        continue
+                    key = (round(grp.at[idx, 'latitude'], 6), round(grp.at[idx, 'longitude'], 6))
+                    coord_numbers.setdefault(key, set()).add(grp.at[idx, 'house_number_numeric'])
+                fallback_coords = {k for k, nums in coord_numbers.items() if len(nums) > 1}
+                if not fallback_coords:
+                    continue
+                trusted, flagged = [], []
+                for idx in grp.index:
+                    if 'Koordinate korrigiert' in str(working_df_sorted.at[idx, 'geocoding_error'] or ''):
+                        trusted.append(idx)
+                        continue
+                    key = (round(grp.at[idx, 'latitude'], 6), round(grp.at[idx, 'longitude'], 6))
+                    (flagged if key in fallback_coords else trusted).append(idx)
+                if not trusted or not flagged:
+                    continue
+                trusted_sorted = sorted(trusted, key=lambda i: working_df_sorted.at[i, 'house_number_numeric'])
+                for idx in flagged:
+                    n = working_df_sorted.at[idx, 'house_number_numeric']
+                    lower = [i for i in trusted_sorted if working_df_sorted.at[i, 'house_number_numeric'] <= n]
+                    upper = [i for i in trusted_sorted if working_df_sorted.at[i, 'house_number_numeric'] >= n]
+                    ref = []
+                    if lower:
+                        ref.append(lower[-1])
+                    if upper:
+                        ref.append(upper[0])
+                    if not ref:
+                        continue
+                    working_df_sorted.at[idx, 'latitude'] = sum(working_df_sorted.at[i, 'latitude'] for i in ref) / len(ref)
+                    working_df_sorted.at[idx, 'longitude'] = sum(working_df_sorted.at[i, 'longitude'] for i in ref) / len(ref)
+                    working_df_sorted.at[idx, 'geocoding_error'] = 'Koordinate interpoliert: nur Straßenmitte gefunden'
+                    interpolated += 1
+            if interpolated:
+                print(f"ℹ️ Straßenmitte-Interpolation: {interpolated} Adressen zwischen Nachbar-Hausnummern platziert")
+        except Exception as e:
+            print(f"Street-center interpolation skipped: {e}")
+        
         # Now apply geographic optimization between street groups
         print("Applying geographic optimization between street groups...")
         
