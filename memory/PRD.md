@@ -55,6 +55,14 @@ Die Umgebung wurde auf den Stand von ~04.03.2026 zurückgesetzt (Rollback). Alle
 - Kitzscher-Job (990ecb84) geheilt: 7 interpoliert, 776m-Phantomsprung weg, verbleibende >400m-Sprünge = echte lange Dorfstraßen
 - Neue Tests: tests/test_street_center_interpolation.py; Gesamtsuite 14/14 + rebuild grün
 
+## 2026-08-17: BUGFIX numpy-Bool BSON-Crash (Testing-Agent iteration_6+7: 20/20 pass)
+- User-Bug: Regis-Breitingen-Job crashte nach Geocoding beim Speichern: "cannot encode object: np.True_"
+- RCA (Testing-Agent): Wenn ≥1 Geocode fehlschlägt, werden lat/lon-Spalten object-dtype → row.get() liefert rohe numpy-Skalare → `is_geocoded = (...)`-Vergleich ergibt np.bool_ → pymongo kann nicht encoden
+- Fix: (1) `is_geocoded = bool(...)`, (2) rekursiver Helper `to_bson_safe()` (np.generic→.item(), ndarray→tolist) an ALLEN 3 routes_collection.insert_one-Stellen, (3) np.generic-Branch in row_dict-Loops
+- Regis-Breitingen erfolgreich neu verarbeitet (Job 0cc914d1): 665/671 geocodiert, 6 saubere OT-Blöcke (Regis→Regis-Stadt→Breitingen→Wildenhain→Ramsdorf→Hagenest), max Sprung 3,1 km, 16 interpoliert, 2 Ausreißer korrigiert, PLZ-Guard verwarf 24 Falsch-Treffer
+- Neue Tests: test_numpy_bool_rca.py, test_numpy_bool_storage.py, test_numpy_storage_unit.py, test_e2e_numpy_bool_upload.py
+- Optionale Härtung (Testing-Agent-Hinweis, offen): to_bson_safe auch für addresses_collection.insert_many (Legacy-Pfad, Zeile ~2092); HTTPException-Re-Raise in /api/optimized-Handlern (404 statt 500)
+
 ## Unterstützte Excel-Formate
 1. Deutsche Glasfaser/Worpswede: `Projektname Strasse` (mit Code-Präfix "624 Worpswede X"), Hausnummer, PLZ, Ort
 2. Standard deutsch: Straße/Strasse, Hausnummer, Zusatz, PLZ, Ort, (Teilort/Ortsteil/Stadtteil/District → OT)

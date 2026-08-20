@@ -1,5 +1,6 @@
 import sys, math, uuid
 import pandas as pd
+import numpy as np
 from datetime import datetime
 from dotenv import load_dotenv
 load_dotenv('/app/backend/.env')
@@ -40,6 +41,8 @@ for idx, row in optimized_df.iterrows():
             row_dict[k] = None
         elif pd.isna(v):
             row_dict[k] = None
+        elif isinstance(v, np.generic):
+            row_dict[k] = v.item()
         else:
             row_dict[k] = v
     lat, lon = row.get('latitude'), row.get('longitude')

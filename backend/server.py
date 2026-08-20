@@ -7,6 +7,22 @@ from pydantic import BaseModel
 from datetime import datetime
 from io import BytesIO
 import pandas as pd
+import numpy as np
+
+
+def to_bson_safe(obj):
+    """Rekursiv alle numpy-Typen in native Python-Typen wandeln (BSON-kompatibel)."""
+    if isinstance(obj, np.generic):
+        return obj.item()
+    if isinstance(obj, np.ndarray):
+        return obj.tolist()
+    if isinstance(obj, dict):
+        return {k: to_bson_safe(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [to_bson_safe(v) for v in obj]
+    return obj
+
+
 import requests
 import time
 import math
@@ -2110,7 +2126,7 @@ async def process_upload_job(job_id: str, file_content: bytes, filename: str):
             "created_at": datetime.now()
         }
         
-        routes_collection.insert_one(route)
+        routes_collection.insert_one(to_bson_safe(route))
         
         # Update job as completed
         upload_jobs_collection.update_one(
@@ -2628,6 +2644,9 @@ async def _process_street_sorted_job_inner(job_id: str, file_content: bytes, fil
                     row_dict[k] = None
                 elif pd.isna(v):  # CRITICAL FIX: Handle NaT and other pd.NA values
                     row_dict[k] = None
+                elif isinstance(v, np.generic):
+                    # numpy-Skalare (np.bool_, np.int64, ...) sind nicht BSON-kompatibel
+                    row_dict[k] = v.item()
                 else:
                     row_dict[k] = v
             
@@ -2652,7 +2671,7 @@ async def _process_street_sorted_job_inner(job_id: str, file_content: bytes, fil
             "sorting_type": "street_based"
         }
         
-        routes_collection.insert_one(route_data)
+        routes_collection.insert_one(to_bson_safe(route_data))
         
         # Update job as completed
         upload_jobs_collection.update_one(
@@ -2985,13 +3004,16 @@ async def _process_geographic_optimization_job_inner(job_id: str, file_content: 
                     row_dict[k] = None
                 elif pd.isna(v):  # CRITICAL FIX: Handle NaT and other pd.NA values
                     row_dict[k] = None
+                elif isinstance(v, np.generic):
+                    # numpy-Skalare (np.bool_, np.int64, ...) sind nicht BSON-kompatibel
+                    row_dict[k] = v.item()
                 else:
                     row_dict[k] = v
             
             # Determine if address was successfully geocoded
             lat = row.get('latitude')
             lon = row.get('longitude')
-            is_geocoded = (lat is not None and lon is not None and 
+            is_geocoded = bool(lat is not None and lon is not None and 
                           not pd.isna(lat) and not pd.isna(lon) and
                           lat != 0 and lon != 0)
             
@@ -3017,7 +3039,7 @@ async def _process_geographic_optimization_job_inner(job_id: str, file_content: 
             "optimization_type": "geographic_door_to_door"
         }
         
-        routes_collection.insert_one(route_data)
+        routes_collection.insert_one(to_bson_safe(route_data))
         
         # Update job as completed
         upload_jobs_collection.update_one(

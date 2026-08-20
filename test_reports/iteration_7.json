@@ -1,0 +1,31 @@
+{
+  "summary": "Backend-only re-verification of the numpy-bool (np.True_) BSON encode fix. (1) Confirmed the code changes exist in /app/backend/server.py: to_bson_safe() recursive helper (lines 13-23), 'is_geocoded = bool(' at line 3016, and exactly 3 'insert_one(to_bson_safe(' call sites (lines 2129, 2674, 3042). (2) Ran the requested suite: 19 tests passed (test_numpy_bool_rca, test_numpy_bool_storage, test_numpy_storage_unit, test_street_center_interpolation, test_geocoding_fixes, test_hsnr_detection, test_e2e_upload) plus tests/test_rebuild.py -> 'ALLE TESTS BESTANDEN'. (3) Wrote and ran a NEW E2E (tests/test_e2e_numpy_bool_upload.py) reproducing the original failure chain over the public URL: 6-row SDU xlsx (STREET_NAME/NUMBER/NUMBER_AFFIX/PLZ/MUNICIPALITY/DISTRICT) with 1 deliberately unfindable address ('Qqqxyzstraße 999', forcing object-dtype lat/lon -> np.bool_ path) + 5 real 04565 Regis-Breitingen addresses. POST /api/upload-optimized -> job polled on /api/job/{id} reached status 'completed' (NOT error), routes doc persisted, all 6 addresses returned with native JSON boolean 'geocoded' flags (mix of True and False as expected), MongoDB doc verified type(geocoded) is bool, and GET /api/optimized/{id}/export returned 200 with non-empty content. The bug is FIXED. Test job deleted afterwards; real jobs (990ecb84, e3dbe9db, 09e00ba9, ...) untouched.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/optimized/{job_id}", "issue": "Broad 'except Exception' re-wraps the internal 404 HTTPException, so a missing route returns HTTP 500 with detail '404: Optimized route not found' instead of a clean 404. Same anti-pattern appears in the neighbouring export handler."},
+      {"endpoint": "internal - addresses_collection.insert_many (server.py:2092, legacy /api/upload path)", "issue": "Not wrapped in to_bson_safe(); relies on manual per-field sanitizing (original_row_index from iterrows, lat/lon). Low risk today but the same class of numpy-leak bug could resurface here."}
+    ]
+  },
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_e2e_numpy_bool_upload.py",
+    "/app/test_reports/pytest/pytest_results_iter7.xml"
+  ],
+  "action_items": [
+    "Optional hardening: apply to_bson_safe() to addresses_collection.insert_many (server.py:2092) for defense in depth.",
+    "Optional: re-raise HTTPException before the generic handler in /api/optimized/{job_id} (and its /export sibling) so 404s aren't reported as 500s.",
+    "Proceed with the real 671-address Regis-Breitingen re-upload; storage path is verified safe."
+  ],
+  "critical_code_review_comments": [
+    "to_bson_safe() is correct and recursive (np.generic->.item(), np.ndarray->tolist(), dict/list recursion); applied at all 3 routes_collection insert sites, which closes the np.True_ leak at the DB boundary regardless of upstream dtype.",
+    "server.py is very large (>4000 lines); consider splitting geocoding / optimization / routes API into modules for maintainability."
+  ],
+  "updated_files": ["/app/backend/tests/test_e2e_numpy_bool_upload.py"],
+  "success_rate": {"backend": "100% (20/20 tests: 19 existing + 1 new E2E; plus test_rebuild.py script)", "frontend": "not tested (backend-only request)"},
+  "seed_data_creation": "Temporary upload job for TEST_regis_numpy.xlsx (6 Regis-Breitingen rows incl. 1 unfindable address); deleted via DELETE /api/job/{id} in test teardown. No real jobs modified.",
+  "should_call_test_agent_after_fix": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "The np.True_ BSON bug is verified fixed end-to-end. Regression coverage lives in /app/backend/tests/test_e2e_numpy_bool_upload.py (uses REACT_APP_BACKEND_URL, response field names are 'optimized_addresses' and per-address flag 'geocoded'). Geocoding is cache-backed so the 6-row E2E finishes in ~12s. Keep uploads tiny and sequential because of the singleton _geocoding_job_lock. Do NOT delete real jobs 990ecb84, e3dbe9db, 09e00ba9.",
+  "rca_of_the_issue": "Original RCA (iteration_6) confirmed: when at least one geocode fails, the latitude/longitude DataFrame columns become object dtype, so row.get() returns raw numpy scalars; the is_geocoded comparison then produced np.bool_ which pymongo cannot encode ('cannot encode object: np.True_'). Fix now casts is_geocoded with bool() and, more importantly, recursively sanitizes the whole document via to_bson_safe() at every routes_collection.insert_one call. Reproduced the exact trigger conditions in a fresh E2E upload and the job completed successfully with native bool flags."
+}

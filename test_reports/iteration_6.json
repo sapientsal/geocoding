@@ -1,0 +1,38 @@
+{
+  "summary": "Backend-only verification of the numpy-scalar BSON fix. Ran 2 tiny SDU-format E2E uploads (5 rows each, sequential) which both completed and exported fine, plus full regression suite (18 tests pass). CRITICAL FINDING: the applied fix does NOT fix the reported bug. Reproduced the exact error 'cannot encode object: np.True_, of type: <class numpy.bool>' against the real optimize_geographic_route output in /app/backend/tests/test_numpy_bool_rca.py. Root cause is address_data['geocoded'] = is_geocoded (np.bool_), not row_dict: pandas 2.3 row.to_dict() already boxes numpy scalars to natives (verified), so the new 'elif isinstance(v, np.generic)' branch is effectively dead code, while row.get(...) on an OBJECT-dtype latitude/longitude column returns raw numpy scalars.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "POST /api/upload-optimized (process_optimized_upload_job, server.py ~line 3005-3027)", "issue": "BUG NOT FIXED: 'is_geocoded = (... and lat != 0 and lon != 0)' evaluates to np.bool_ when lat/lon come from an object-dtype column (happens whenever at least one geocode returns None -> column becomes object dtype -> outlier correction/interpolation writes np.float64 medians via .at). np.float64 encodes fine (float subclass) but np.bool_ does not -> routes_collection.insert_one raises 'cannot encode object: np.True_' and the job goes to status=error. Reproduced deterministically in tests/test_numpy_bool_rca.py (leak: index 4, field 'geocoded', np.True_). Fix: bool(is_geocoded) AND/OR a recursive sanitize_for_mongo(doc) applied to route_data before insert_one.", "priority": "CRITICAL"}
+    ],
+    "minor": [
+      {"endpoint": "server.py row_dict loops (lines ~2632 and ~2992)", "issue": "The added 'elif isinstance(v, np.generic): v.item()' branch is dead code under pandas 2.3.0 (Series.to_dict boxes numpy scalars via maybe_box_native, verified for bool/int/float and for object columns holding np.bool_). Harmless but gives false confidence; real numpy leakage happens through row.get(...), not row.to_dict()."}
+    ]
+  },
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_numpy_bool_storage.py",
+    "/app/backend/tests/test_numpy_bool_rca.py",
+    "/app/backend/tests/test_numpy_storage_unit.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "Wrap the geographic-optimization address_data['geocoded'] in bool(...) (server.py ~line 3011) and preferably add a recursive sanitize helper (numpy.generic -> .item(), numpy.ndarray -> tolist()) applied to route_data/address_data before routes_collection.insert_one for BOTH storage loops.",
+    "Also sanitize 'distance_to_next', 'latitude', 'longitude' and 'total_distance' (np.int64 would fail the same way; np.float64 only survives because it subclasses float).",
+    "After the real fix, re-run tests/test_numpy_bool_rca.py (currently FAILS by design, proving the bug) and then re-upload Regis-Breitingen_SDU_Restpotential_200726.xlsx."
+  ],
+  "critical_code_review_comments": [
+    "Do not rely on per-field type branches for BSON safety; add one recursive to_bson_safe() used by every insert_one/update_one that carries pandas-derived data.",
+    "Boolean expressions built with 'and' over numpy comparisons return numpy scalars - always cast with bool()."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_numpy_bool_storage.py (new)",
+    "/app/backend/tests/test_numpy_bool_rca.py (new, intentionally failing repro)",
+    "/app/backend/tests/test_numpy_storage_unit.py (new)"
+  ],
+  "success_rate": {"backend": "18/19 pytest pass; the 1 failure is the RCA repro of the unfixed bug", "frontend": "not tested (backend-only request)"},
+  "seed_data_creation": "2 temporary 5-row upload jobs (TEST_regis_numpybool.xlsx, TEST_regis_partialfail.xlsx) - deleted from upload_jobs and routes by fixture teardown (verified 0 left). Temp collections TEST_tmp_* dropped. Real user jobs (990ecb84, e3dbe9db, 09e00ba9 Regis error job) untouched.",
+  "should_call_test_agent_after_fix": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Key facts: (1) pandas 2.3 Series.to_dict() boxes numpy scalars -> np.generic branch in row_dict never triggers; (2) row.get() on object-dtype columns returns RAW numpy scalars; (3) latitude/longitude become object dtype whenever any geocode returns None, and the outlier-correction/interpolation code writes np.float64 medians into them; (4) resulting np.bool_ in address_data['geocoded'] is the actual crash. tests/test_numpy_bool_rca.py replicates the exact server storage snippet and must turn green after the real fix. Tiny 5-row uploads complete in ~8s; only one job may run at a time (singleton lock).",
+  "rca_of_the_issue": "Failure chain: >=1 failed geocode -> working_df.loc assignment of None makes 'latitude'/'longitude' object dtype -> outlier correction (server.py:784-800) computes Series.median() (np.float64) and writes it with .at into the object column -> iterrows/row.get('latitude') returns np.float64 (object columns are not boxed) -> is_geocoded = (... and lat != 0 and lon != 0) returns np.bool_ -> routes_collection.insert_one fails with 'cannot encode object: np.True_, of type: <class numpy.bool>' -> except block sets job status=error. The applied fix only sanitizes row_dict (row.to_dict()), which was already numpy-free, so the Regis-Breitingen upload will fail again."
+}

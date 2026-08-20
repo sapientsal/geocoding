@@ -1,7 +1,78 @@
-<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="1" skipped="0" tests="11" time="16.809" timestamp="2026-08-16T21:52:20.707019+00:00" hostname="agent-env-c03e45c4-37e6-49bc-bf09-b5a0eadef2ae"><testcase classname="tests.test_geocoding_fixes.TestOutlierCorrection" name="test_single_outlier_snapped_to_street_median" time="0.021"><failure message="AssertionError: geocoding_error should note correction, got 'Koordinate interpoliert: nur Straßenmitte gefunden'&#10;assert 'Koordinate korrigiert' in 'Koordinate interpoliert: nur Straßenmitte gefunden'&#10; +  where 'Koordinate interpoliert: nur Straßenmitte gefunden' = str('Koordinate interpoliert: nur Straßenmitte gefunden')&#10; +    where 'Koordinate interpoliert: nur Straßenmitte gefunden' = get('geocoding_error', '')&#10; +      where get = Straße                                                      Schimmelgasse\nHausnummer                                                             64\nPLZ                                                                  6493\nOrt                                                              Opperode\noriginal_address                         Schimmelgasse 64, 06493 Opperode\nlatitude                                                           51.719\nlongitude                                                          11.249\nformatted_address                                        Schimmelgasse 64\ngeocoded                                                             True\ngeocoding_error         Koordinate interpoliert: nur Straßenmitte gefu...\nstreet_clean                                                Schimmelgasse\nstreet_city_key                                   Schimmelgasse, Opperode\nhouse_number_numeric                                                   64\nhouse_number_letter                                                      \ndistance_to_next_m                                                    0.0\nName: 4, dtype: object.get">tests/test_geocoding_fixes.py:62: in test_single_outlier_snapped_to_street_median
-    assert 'Koordinate korrigiert' in str(outlier_row.get('geocoding_error', '')), \
-E   AssertionError: geocoding_error should note correction, got 'Koordinate interpoliert: nur Straßenmitte gefunden'
-E   assert 'Koordinate korrigiert' in 'Koordinate interpoliert: nur Straßenmitte gefunden'
-E    +  where 'Koordinate interpoliert: nur Straßenmitte gefunden' = str('Koordinate interpoliert: nur Straßenmitte gefunden')
-E    +    where 'Koordinate interpoliert: nur Straßenmitte gefunden' = get('geocoding_error', '')
-E    +      where get = Straße                                                      Schimmelgasse\nHausnummer                                                             64\nPLZ                                                                  6493\nOrt                                                              Opperode\noriginal_address                         Schimmelgasse 64, 06493 Opperode\nlatitude                                                           51.719\nlongitude                                                          11.249\nformatted_address                                        Schimmelgasse 64\ngeocoded                                                             True\ngeocoding_error         Koordinate interpoliert: nur Straßenmitte gefu...\nstreet_clean                                                Schimmelgasse\nstreet_city_key                                   Schimmelgasse, Opperode\nhouse_number_numeric                                                   64\nhouse_number_letter                                                      \ndistance_to_next_m                                                    0.0\nName: 4, dtype: object.get</failure></testcase><testcase classname="tests.test_geocoding_fixes.TestOutlierCorrection" name="test_no_correction_when_all_coords_valid" time="0.015" /><testcase classname="tests.test_geocoding_fixes.TestPlzValidation" name="test_opperode_rejects_erzhausen_hit" time="0.636" /><testcase classname="tests.test_geocoding_fixes.TestPlzValidation" name="test_valid_ballenstedt_still_geocodes" time="0.482" /><testcase classname="tests.test_geocoding_fixes.TestUserJobHealed" name="test_job_has_no_giant_distances_and_many_corrections" time="0.033" /><testcase classname="tests.test_hsnr_detection" name="test_1_preview_detects_hsnr" time="0.286" /><testcase classname="tests.test_hsnr_detection" name="test_2_e2e_upload_and_export" time="4.897" /><testcase classname="tests.test_hsnr_detection" name="test_zzz_cleanup" time="0.007" /><testcase classname="tests.test_e2e_upload.TestHaldenslebenE2E" name="test_haldensleben_upload_and_sort" time="4.468" /><testcase classname="tests.test_e2e_upload.TestHaldenslebenE2E" name="test_export_haldensleben" time="0.101" /><testcase classname="tests.test_e2e_upload.TestLegacyFormatE2E" name="test_legacy_upload" time="4.627" /></testsuite></testsuites>
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="1" skipped="0" tests="19" time="23.969" timestamp="2026-08-20T09:23:03.673294+00:00" hostname="agent-env-c03e45c4-37e6-49bc-bf09-b5a0eadef2ae"><testcase classname="tests.test_e2e_upload.TestHaldenslebenE2E" name="test_haldensleben_upload_and_sort" time="4.586" /><testcase classname="tests.test_e2e_upload.TestHaldenslebenE2E" name="test_export_haldensleben" time="0.132" /><testcase classname="tests.test_e2e_upload.TestLegacyFormatE2E" name="test_legacy_upload" time="4.602" /><testcase classname="tests.test_geocoding_fixes.TestOutlierCorrection" name="test_single_outlier_snapped_to_street_median" time="0.020" /><testcase classname="tests.test_geocoding_fixes.TestOutlierCorrection" name="test_no_correction_when_all_coords_valid" time="0.013" /><testcase classname="tests.test_geocoding_fixes.TestPlzValidation" name="test_opperode_rejects_erzhausen_hit" time="0.624" /><testcase classname="tests.test_geocoding_fixes.TestPlzValidation" name="test_valid_ballenstedt_still_geocodes" time="0.614" /><testcase classname="tests.test_geocoding_fixes.TestUserJobHealed" name="test_job_has_no_giant_distances_and_many_corrections" time="0.032" /><testcase classname="tests.test_hsnr_detection" name="test_1_preview_detects_hsnr" time="0.107" /><testcase classname="tests.test_hsnr_detection" name="test_2_e2e_upload_and_export" time="4.833" /><testcase classname="tests.test_hsnr_detection" name="test_zzz_cleanup" time="0.012" /><testcase classname="tests.test_numpy_bool_rca" name="test_np_bool_leak_first_row_failed" time="0.028"><failure message="AssertionError: BSON insert failed: cannot encode object: np.True_, of type: &lt;class 'numpy.bool'&gt; | leaks: [(4, 'geocoded', 'bool', 'np.True_')]&#10;assert &quot;cannot encode object: np.True_, of type: &lt;class 'numpy.bool'&gt;&quot; is None">coll = Collection(Database(MongoClient(host=['localhost:27017'], document_class=dict, tz_aware=False, connect=True), 'sales_routes'), 'TEST_tmp_numpy_rca')
+
+    def test_np_bool_leak_first_row_failed(coll):
+        n = 8
+        df = pd.DataFrame({
+            'STREET_NAME': ['Bahnhofstraße'] * n,
+            'NUMBER': list(range(1, n + 1)),
+            'NUMBER_AFFIX': [None] * n,
+            'PLZ': [4565] * n,
+            'MUNICIPALITY': ['Regis-Breitingen'] * n,
+            'DISTRICT': ['Regis-Breitingen'] * n,
+        })
+        addresses = [f"Bahnhofstraße {i}, 04565 Regis-Breitingen" for i in range(1, n + 1)]
+    
+        # first geocode FAILS -&gt; latitude/longitude columns become object dtype
+        geocoded_data = [{'latitude': None, 'longitude': None, 'formatted_address': '',
+                          'geocoded': False, 'error': 'not found'}]
+        # valid coordinates + one far outlier (&gt;2 km) so the outlier correction writes
+        # the street MEDIAN (np.float64 on an object-dtype column) back via .at
+        for i in range(1, n):
+            if i == 4:
+                geocoded_data.append({'latitude': 51.2000, 'longitude': 12.7000,
+                                      'formatted_address': 'outlier', 'geocoded': True, 'error': ''})
+            else:
+                geocoded_data.append({'latitude': 51.0854 + i * 0.0002, 'longitude': 12.4300 + i * 0.0002,
+                                      'formatted_address': f'addr {i}', 'geocoded': True, 'error': ''})
+    
+        optimized_df, total_distance = optimize_geographic_route(df, geocoded_data, addresses)
+        print("dtypes:", {c: str(t) for c, t in optimized_df.dtypes.items() if c in ('latitude', 'longitude')})
+    
+        leaks = []
+        docs = []
+        for idx, row in optimized_df.iterrows():
+            row_dict = {}
+            for k, v in row.to_dict().items():
+                if isinstance(v, float) and (pd.isna(v) or math.isinf(v)):
+                    row_dict[k] = None
+                elif pd.isna(v):
+                    row_dict[k] = None
+                elif isinstance(v, np.generic):
+                    row_dict[k] = v.item()
+                else:
+                    row_dict[k] = v
+    
+            lat = row.get('latitude')
+            lon = row.get('longitude')
+            is_geocoded = (lat is not None and lon is not None and
+                           not pd.isna(lat) and not pd.isna(lon) and
+                           lat != 0 and lon != 0)
+            ad = {
+                "original_address": row.get('original_address', ''),
+                "latitude": None if pd.isna(lat) else lat,
+                "longitude": None if pd.isna(lon) else lon,
+                "formatted_address": row.get('formatted_address', ''),
+                "geocoded": is_geocoded,
+                "geocoding_error": row.get('geocoding_error', ''),
+                "distance_to_next": None if pd.isna(row.get('distance_to_next_m')) else row.get('distance_to_next_m'),
+                "row_data": row_dict,
+            }
+            for k, v in ad.items():
+                if type(v).__module__ == 'numpy' and not isinstance(v, (float, int)) or isinstance(v, np.bool_):
+                    leaks.append((idx, k, type(v).__name__, repr(v)))
+            docs.append(ad)
+    
+        err = None
+        try:
+            coll.insert_one({"job_id": "TEST_rca", "optimized_addresses": docs,
+                             "total_distance": total_distance})
+        except Exception as exc:
+            err = str(exc)
+    
+        print("LEAKS:", leaks)
+        print("INSERT ERROR:", err)
+&gt;       assert err is None, f"BSON insert failed: {err} | leaks: {leaks}"
+E       AssertionError: BSON insert failed: cannot encode object: np.True_, of type: &lt;class 'numpy.bool'&gt; | leaks: [(4, 'geocoded', 'bool', 'np.True_')]
+E       assert "cannot encode object: np.True_, of type: &lt;class 'numpy.bool'&gt;" is None
+
+tests/test_numpy_bool_rca.py:109: AssertionError</failure></testcase><testcase classname="tests.test_numpy_bool_storage.TestNumpyBoolStorage" name="test_sdu_upload_with_bool_column" time="4.557" /><testcase classname="tests.test_numpy_bool_storage.TestNumpyBoolStorage" name="test_export_works" time="0.098" /><testcase classname="tests.test_numpy_bool_storage.TestNumpyBoolWithFailedGeocodes" name="test_mixed_geocode_success_failure" time="2.326" /><testcase classname="tests.test_numpy_storage_unit" name="test_storage_snippet_is_bson_safe" time="0.040" /><testcase classname="tests.test_street_center_interpolation" name="test_interpolation_moves_street_center_fallbacks" time="0.016" /><testcase classname="tests.test_street_center_interpolation" name="test_multiunit_same_housenumber_not_interpolated" time="0.015" /><testcase classname="tests.test_street_center_interpolation" name="test_healed_kitzscher_job_readonly" time="0.013" /></testsuite></testsuites>
