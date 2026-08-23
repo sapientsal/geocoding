@@ -8,6 +8,7 @@ from datetime import datetime
 from io import BytesIO
 import pandas as pd
 import numpy as np
+from bson.binary import Binary
 
 
 def to_bson_safe(obj):
@@ -70,6 +71,13 @@ def clean_numeric_string(value) -> str:
     
     # For strings and other types, just convert to string
     return str(value).strip()
+
+def normalize_plz(value) -> str:
+    """PLZ als 5-stelligen String zurückgeben – stellt führende Nullen wieder her (6493 → 06493)."""
+    plz = clean_numeric_string(value)
+    if plz.isdigit() and 3 <= len(plz) <= 4:
+        plz = plz.zfill(5)
+    return plz
 
 def clean_dataframe_for_excel(df: pd.DataFrame) -> pd.DataFrame:
     """
@@ -156,16 +164,29 @@ app = FastAPI(
 
 @app.on_event("startup")
 async def on_startup():
-    """On startup, mark any orphaned in-progress jobs as errored (server was killed mid-run)."""
+    """On startup: auto-resume interrupted jobs (file stored) or mark them errored."""
     try:
-        upload_jobs_collection.update_many(
-            {"status": {"$in": ["parsing", "geocoding", "sorting", "optimizing"]}},
-            {"$set": {
-                "status": "error",
-                "error_message": "Server wurde neu gestartet – Job abgebrochen. Bitte Datei erneut hochladen."
-            }}
-        )
-        print("✅ Startup: Orphaned jobs cleaned up")
+        orphaned = list(upload_jobs_collection.find(
+            {"status": {"$in": ["uploading", "parsing", "geocoding", "sorting", "optimizing"]}}))
+        for job in orphaned:
+            if job.get("file_data") and job.get("optimization_type") == "geographic_door_to_door":
+                upload_jobs_collection.update_one(
+                    {"id": job["id"]},
+                    {"$set": {
+                        "status": "geocoding",
+                        "progress_message": "Nach Server-Neustart automatisch fortgesetzt – bereits geocodierte Adressen werden aus dem Cache übernommen"
+                    }})
+                asyncio.create_task(process_geographic_optimization_job(
+                    job["id"], bytes(job["file_data"]), job["filename"]))
+                print(f"🔄 Startup: Auto-Resume für Job {job['id']} ({job['filename']})")
+            else:
+                upload_jobs_collection.update_one(
+                    {"id": job["id"]},
+                    {"$set": {
+                        "status": "error",
+                        "error_message": "Server wurde neu gestartet – Job abgebrochen. Bitte Datei erneut hochladen."
+                    }})
+        print("✅ Startup: Orphaned jobs processed")
     except Exception as e:
         print(f"⚠️ Startup cleanup failed: {e}")
 
@@ -260,6 +281,7 @@ try:
     addresses_collection = db['addresses']
     routes_collection = db['routes']
     upload_jobs_collection = db['upload_jobs']
+    geocode_cache_collection = db['geocode_cache']
     
     print("✅ MongoDB connection successful")
 except Exception as e:
@@ -273,6 +295,7 @@ except Exception as e:
         addresses_collection = db['addresses']
         routes_collection = db['routes']
         upload_jobs_collection = db['upload_jobs']
+        geocode_cache_collection = db['geocode_cache']
         print("✅ MongoDB fallback connection successful")
     except Exception as fallback_error:
         print(f"❌ MongoDB fallback also failed: {fallback_error}")
@@ -1450,6 +1473,16 @@ async def geocode_address_with_cache(address: str, job_logger: JobLogger = None)
     if address in address_cache:
         return address_cache[address]
 
+    # ── Persistenter Cache (überlebt Server-Neustarts) ───────────────────────
+    try:
+        cached_doc = geocode_cache_collection.find_one({'_id': address})
+        if cached_doc and cached_doc.get('result'):
+            result = cached_doc['result']
+            address_cache[address] = result
+            return result
+    except Exception:
+        pass
+
     address_clean = address.strip()
     if not address_clean:
         return {'latitude': None, 'longitude': None,
@@ -1507,6 +1540,11 @@ async def geocode_address_with_cache(address: str, job_logger: JobLogger = None)
                             f'Geocoded via {api_name}: {result.get("formatted_address", "")}',
                             address=address_clean)
                     address_cache[address] = result
+                    try:
+                        geocode_cache_collection.replace_one(
+                            {'_id': address}, {'_id': address, 'result': result}, upsert=True)
+                    except Exception:
+                        pass
                     return result
                 # API returned nothing (not found) – try next without penalty
             except Exception as exc:
@@ -1522,65 +1560,6 @@ async def geocode_address_with_cache(address: str, job_logger: JobLogger = None)
     address_cache[address] = fail
     return fail
 
-def geocode_address_cached(address: str) -> tuple:
-    """Geocode an address with caching for performance"""
-    try:
-        # Check cache first
-        if address in address_cache:
-            cached_result = address_cache[address]
-            return cached_result['lat'], cached_result['lon'], cached_result['formatted'], cached_result['error']
-        
-        # Add reduced delay for better performance (0.5 seconds instead of 1)
-        time.sleep(0.5)
-        
-        url = "https://nominatim.openstreetmap.org/search"
-        params = {
-            'q': address,
-            'format': 'json',
-            'limit': 1,
-            'addressdetails': 1
-        }
-        
-        headers = {
-            'User-Agent': 'SalesRouteOptimizer/1.0'
-        }
-        
-        response = requests.get(url, params=params, headers=headers, timeout=10)
-        response.raise_for_status()
-        
-        data = response.json()
-        
-        if data:
-            result = data[0]
-            lat = float(result['lat'])
-            lon = float(result['lon'])
-            formatted_address = result.get('display_name', address)
-            
-            # Cache the result
-            address_cache[address] = {
-                'lat': lat,
-                'lon': lon,
-                'formatted': formatted_address,
-                'error': None
-            }
-            
-            return lat, lon, formatted_address, None
-        else:
-            error_msg = f"No results found for address: {address}"
-            address_cache[address] = {
-                'lat': None,
-                'lon': None,
-                'formatted': None,
-                'error': error_msg
-            }
-            return None, None, None, error_msg
-            
-    except requests.exceptions.RequestException as e:
-        error_msg = f"Geocoding API error: {str(e)}"
-        return None, None, None, error_msg
-    except Exception as e:
-        error_msg = f"Geocoding error: {str(e)}"
-        return None, None, None, error_msg
 def geocode_address(address: str) -> tuple:
     """Geocode an address with caching and retry logic for performance"""
     try:
@@ -2014,7 +1993,7 @@ async def process_upload_job(job_id: str, file_content: bytes, filename: str):
                 street = clean_numeric_string(row[street_col]) if street_col else ""
                 house_num = clean_numeric_string(row[house_num_col]) if house_num_col else ""
                 zusatz = clean_numeric_string(row[zusatz_col]) if zusatz_col else ""
-                plz = clean_numeric_string(row[plz_col]) if plz_col else ""
+                plz = normalize_plz(row[plz_col]) if plz_col else ""
                 ort = clean_numeric_string(row[ort_col]) if ort_col else ""
                 
                 # Skip empty rows
@@ -2212,7 +2191,7 @@ async def preview_file(file: UploadFile = File(...)):
                 street = clean_numeric_string(row[street_col]) if street_col else ""
                 house_num = clean_numeric_string(row[house_num_col]) if house_num_col else ""
                 zusatz = clean_numeric_string(row[zusatz_col]) if zusatz_col else ""
-                plz = clean_numeric_string(row[plz_col]) if plz_col else ""
+                plz = normalize_plz(row[plz_col]) if plz_col else ""
                 ort = clean_numeric_string(row[ort_col]) if ort_col else ""
                 
                 if street and ort and street.lower() not in ['nan', ''] and ort.lower() not in ['nan', '']:
@@ -2345,7 +2324,7 @@ async def _process_street_sorted_job_inner(job_id: str, file_content: bytes, fil
                 street = clean_numeric_string(row[street_col]) if pd.notna(row[street_col]) else ""
                 house_num = clean_numeric_string(row[house_num_col]) if pd.notna(row[house_num_col]) else ""
                 zusatz = clean_numeric_string(row[zusatz_col]) if zusatz_col and pd.notna(row[zusatz_col]) else ""
-                plz = clean_numeric_string(row[plz_col]) if pd.notna(row[plz_col]) else ""
+                plz = normalize_plz(row[plz_col]) if pd.notna(row[plz_col]) else ""
                 ort = clean_numeric_string(row[ort_col]) if pd.notna(row[ort_col]) else ""
                 
                 # Clean street name - remove project prefixes
@@ -2764,6 +2743,12 @@ async def upload_file_optimized(background_tasks: BackgroundTasks, file: UploadF
         
         upload_jobs_collection.insert_one(job_data)
         
+        # Datei persistent speichern, damit der Job nach einem Server-Neustart
+        # automatisch fortgesetzt werden kann (Auto-Resume)
+        if len(file_content) < 14 * 1024 * 1024:
+            upload_jobs_collection.update_one(
+                {"id": job_id}, {"$set": {"file_data": Binary(file_content)}})
+        
         # Start background processing
         background_tasks.add_task(process_geographic_optimization_job, job_id, file_content, file.filename)
         
@@ -2852,7 +2837,7 @@ async def _process_geographic_optimization_job_inner(job_id: str, file_content: 
                 street = clean_numeric_string(row[street_col]) if pd.notna(row[street_col]) else ""
                 house_num = clean_numeric_string(row[house_num_col]) if pd.notna(row[house_num_col]) else ""
                 zusatz = clean_numeric_string(row[zusatz_col]) if zusatz_col and pd.notna(row[zusatz_col]) else ""
-                plz = clean_numeric_string(row[plz_col]) if pd.notna(row[plz_col]) else ""
+                plz = normalize_plz(row[plz_col]) if pd.notna(row[plz_col]) else ""
                 ort = clean_numeric_string(row[ort_col]) if pd.notna(row[ort_col]) else ""
                 
                 # Clean street name - remove project prefixes
@@ -2919,6 +2904,7 @@ async def _process_geographic_optimization_job_inner(job_id: str, file_content: 
                 
                 try:
                     print(f"Geocoding address {i+1}/{total_addresses}: {address}")
+                    was_cached = address in address_cache
                     geocoded = await geocode_address_with_cache(address, job_logger)
                     geocoded_data.append(geocoded)
                     
@@ -2930,7 +2916,7 @@ async def _process_geographic_optimization_job_inner(job_id: str, file_content: 
                         print(f"❌ Failed to geocode: {address} - {geocoded.get('error', 'Unknown error')}")
                     
                     # Update progress more frequently
-                    if (i + 1) % 10 == 0 or i == total_addresses - 1:
+                    if (i + 1) % 5 == 0 or i == total_addresses - 1:
                         upload_jobs_collection.update_one(
                             {"id": job_id},
                             {"$set": {
@@ -2940,8 +2926,9 @@ async def _process_geographic_optimization_job_inner(job_id: str, file_content: 
                             }}
                         )
                     
-                    # Small polite delay between addresses (multi-API handles rate limits)
-                    await asyncio.sleep(0.1)
+                    # Small polite delay between addresses (skip for cache hits → fast resume)
+                    if not was_cached:
+                        await asyncio.sleep(0.1)
                     
                     # Memory management: Clear cache periodically for very large datasets
                     if i > 0 and i % 1000 == 0:
@@ -3990,13 +3977,13 @@ async def get_jobs():
     for job in jobs:
         job_data = {
             "id": job["id"],
-            "filename": job["filename"],
-            "status": job["status"],
-            "total_addresses": job["total_addresses"],
-            "processed_addresses": job["processed_addresses"],
-            "geocoded_addresses": job["geocoded_addresses"],
+            "filename": job.get("filename", ""),
+            "status": job.get("status", "unknown"),
+            "total_addresses": job.get("total_addresses", 0),
+            "processed_addresses": job.get("processed_addresses", 0),
+            "geocoded_addresses": job.get("geocoded_addresses", 0),
             "error_message": job.get("error_message"),
-            "created_at": job["created_at"].isoformat() if job["created_at"] else None,
+            "created_at": job["created_at"].isoformat() if job.get("created_at") else None,
             "completed_at": job["completed_at"].isoformat() if job.get("completed_at") else None,
             "sorting_type": job.get("sorting_type", "route_optimization")  # Add sorting_type
         }
@@ -4028,7 +4015,7 @@ async def get_cache_stats():
     cache_size = len(address_cache)
     
     # Count successful vs failed entries
-    successful = sum(1 for entry in address_cache.values() if entry['lat'] is not None)
+    successful = sum(1 for entry in address_cache.values() if entry.get('latitude') is not None)
     failed = cache_size - successful
     
     # Calculate cache hit rate (estimated)
@@ -4054,6 +4041,9 @@ async def clear_geocoding_cache():
         "message": f"Cache cleared successfully. Removed {old_size} entries.",
         "new_cache_size": 0
     }
+
+@app.get("/api/health")
+async def health_check():
     """Health check endpoint"""
     return {"status": "healthy", "message": "Sales Route Optimizer API is running"}
 

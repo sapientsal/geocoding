@@ -1,0 +1,39 @@
+{
+  "summary": "Backend-only follow-up verification of iteration_8 action items. All 4 requested tests PASS. (1) PLZ leading-zero E2E: uploaded a 4-row xlsx with PLZ as int64 6493 / Ort Ballenstedt via POST /api/upload-optimized -> job completed, all 4 original_address strings contain '06493' (no ', 6493 '), and the 4 newly created geocode_cache keys are 'Allee 21, 06493 Ballenstedt', 'Bahnhofstrasse 12, 06493 Ballenstedt', 'Markt 7, 06493 Ballenstedt', 'Schlossplatz 3, 06493 Ballenstedt' - all 4 geocoded successfully via Photon with correct coords (~51.72, 11.22-11.25). Whole geocode_cache (192 docs) now has ZERO keys with an unpadded 4-digit PLZ. (2) GET /api/cache/stats -> 200 with valid JSON on non-empty cache (cache_size 4, successful 4, hit_rate 100.0%). (3) GET /api/jobs -> 200, valid JSON list, no mongo _id leakage, all expected keys present. (4) Regression: tests/test_geocoding_fixes.py + tests/test_street_center_interpolation.py = 8 passed; tests/test_rebuild.py = ALLE TESTS BESTANDEN. Also added a normalize_plz() unit test (6493->06493, 6493.0->06493, '6493'->06493, 31275->31275, 999->00999, None->'', 'ABC'->'ABC') - all pass. Test job was deleted afterwards; protected real jobs untouched.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/health", "issue": "Returns 404. server.py line ~4103 contains an orphaned docstring + 'return {\"status\": \"healthy\"...}' AFTER the return of clear_geocoding_cache() - the @app.get decorator for the health endpoint was lost, leaving unreachable dead code and no health route."},
+      {"endpoint": "n/a (server.py:1563 geocode_address_cached)", "issue": "Dead legacy helper still reads cached_result['lat'] / ['lon'] / ['formatted'], which no longer exists in the current address_cache schema (latitude/longitude/formatted_address). Same class of bug as the cache/stats KeyError just fixed. Not referenced anywhere - should be deleted before someone calls it."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_plz_zeropad_e2e.py",
+    "/app/backend/tests/test_geocoding_fixes.py",
+    "/app/backend/tests/test_street_center_interpolation.py",
+    "/app/backend/tests/test_rebuild.py"
+  ],
+  "action_items": [
+    "Optional cleanup: restore/remove the dead health-check block at server.py ~line 4103 (currently /api/health = 404).",
+    "Optional cleanup: delete unused geocode_address_cached() (server.py:1563) - it uses the obsolete cache key names 'lat'/'lon'/'formatted'.",
+    "DB hygiene: 16 documents in the 'routes' collection have a job_id with no matching upload_jobs entry (orphans from earlier deleted/purged jobs). Consider a one-off cleanup; DELETE /api/job/{id} itself does clean up correctly."
+  ],
+  "critical_code_review_comments": [
+    "normalize_plz() implementation is correct and applied consistently at all 4 build sites (server.py lines 2055, 2253, 2386, 2899); it only pads 3-4 digit pure-digit values so 5-digit PLZ and alphanumerics are untouched.",
+    "server.py is 4108 lines - well past the 700-line guideline. Split into routers (upload, geocoding, optimization, export, admin) plus a services layer to make regressions like the cache/stats KeyError less likely.",
+    "Geocoding failures are cached only in the in-memory address_cache and not persisted, so a restart correctly retries failed addresses - good. But successful entries persisted in geocode_cache are never invalidated; consider a TTL/version field so schema changes (e.g. the lat->latitude rename) do not silently poison old entries."
+  ],
+  "updated_files": ["/app/backend/tests/test_plz_zeropad_e2e.py"],
+  "success_rate": {"backend": "100%", "frontend": "not tested (backend-only request)"},
+  "seed_data_creation": "One temporary job from TEST_plz_zeropad.xlsx (4 Ballenstedt addresses) - deleted via DELETE /api/job/{id} at teardown. 4 new geocode_cache entries for 06493 Ballenstedt left in place intentionally (valid cache data).",
+  "should_call_test_agent_after_fix": false,
+  "should_main_agent_self_test": true,
+  "test_credentials": "none required",
+  "context_for_next_testing_agent": "New regression harness /app/backend/tests/test_plz_zeropad_e2e.py covers PLZ zero-padding E2E + /api/cache/stats + /api/jobs; run with `cd /app/backend && python3 -m pytest tests/test_plz_zeropad_e2e.py -o addopts='' -v`. It creates and deletes its own job. Note the 4 Ballenstedt addresses are now cached, so the E2E run is fast (cache hit) - to exercise live Photon use unused house numbers. Do NOT touch real jobs 990ecb84, e3dbe9db, 0cc914d1, bcea122c. Geocoding is serialized by a singleton asyncio lock, so keep uploads tiny and sequential. Remaining open items are cosmetic/dead-code only.",
+  "rca_of_the_issue": "No new defects found. Previous iteration_8 root causes are confirmed fixed: (a) pandas read numeric PLZ columns as int64, dropping the leading zero, which made 'Strasse Nr, 6493 Ballenstedt' unresolvable - normalize_plz() now zfill(5)s 3-4 digit numeric PLZ at all address-construction sites; (b) /api/cache/stats crashed with KeyError 'lat' because the cache schema uses 'latitude' - now uses entry.get('latitude')."
+}

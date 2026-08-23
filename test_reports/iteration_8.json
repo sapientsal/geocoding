@@ -1,0 +1,75 @@
+{
+  "summary": "Backend-only verification of the auto-resume / persistent-geocode-cache fix for the reported 'Schwanebeck job hangs and is lost after server restart' bug. Created /app/backend/tests/test_auto_resume_persistence.py (120-address German xlsx, real Schwanebeck 39397 / Ballenstedt 06493 streets). All 4 requested test groups PASS: (1) hard-kill mid-geocoding -> auto-resume fires, job returns to 'geocoding' (not 'error') and completes 120/120 with routes doc + export 200; (2) persistent Mongo 'geocode_cache' populated, identical re-upload completes in 4.3s with 0 live geocoding attempts; (3) no file_data / _id leak in /api/jobs or /api/job/{id}; (4) existing regression suites 9 passed + test_rebuild.py green. Two pre-existing defects found outside the fix: GET /api/cache/stats returns 500 (KeyError), and PLZ leading zeros are stripped by pandas (06493 -> 6493) which measurably changes geocoding results.",
+  "backend_issues": {
+    "critical": [
+      {
+        "endpoint": "GET /api/cache/stats",
+        "issue": "Returns 500 KeyError. Handler does entry['lat'] but geocode cache entries use the key 'latitude' (see server.py ~line 4064: successful = sum(1 for entry in address_cache.values() if entry['lat'] is not None)). Endpoint is broken for any non-empty cache.",
+        "priority": "HIGH"
+      }
+    ],
+    "minor": [
+      {
+        "endpoint": "Excel parsing (all upload endpoints) / clean_numeric_string",
+        "issue": "German PLZ leading zeros are lost: pandas reads the PLZ column as int64, so 06493 becomes '6493' (verified: dtype int64, value 6493). Geocoding then differs measurably - 'Allee 21, 6493 Ballenstedt' -> 51.7333/11.1705 vs 'Allee 21, 06493 Ballenstedt' -> 51.7198/11.2281 (~4.5 km apart). Affects every 0-prefixed PLZ region (01000-09999), incl. the user's own datasets Ballenstedt 06493, Kitzscher 04567, Regis-Breitingen 04565, and pollutes geocode_cache keys with wrong PLZ. Fix: zfill(5) the PLZ (or read the column with dtype=str)."
+      },
+      {
+        "endpoint": "GET /api/jobs",
+        "issue": "Uses direct key access job['total_addresses'] / ['processed_addresses'] / ['geocoded_addresses'] / ['created_at']. Any job document missing one of these fields (e.g. created by a different code path) makes the whole list endpoint 500. Use job.get(...) with defaults."
+      },
+      {
+        "endpoint": "process_geographic_optimization_job (progress reporting)",
+        "issue": "processed_addresses is flushed to Mongo only every 10 addresses ((i+1) % 10 == 0). Files with <10 rows show 0 progress until completion, and after an auto-resume the UI progress jumps back to a low value because the resumed run restarts the counter at 1. Cosmetic but looks like 'hanging' to the user - the exact symptom originally reported."
+      },
+      {
+        "endpoint": "geocode_address_with_cache (persistent cache)",
+        "issue": "Failed geocodes are intentionally not persisted. Consequence: after a real restart every previously failed address is retried through the full 5-API cascade (~2-5 s each). Measured 141 s extra on a 120-address file with 49 failures; for the 892-address Schwanebeck file with ~10% failures a resume will spend several minutes on retries before making new progress. Consider persisting failures with an attempt counter / TTL."
+      },
+      {
+        "endpoint": "on_startup / graceful shutdown",
+        "issue": "Auto-resume only triggers on a HARD kill. 'supervisorctl restart backend' is a graceful stop and uvicorn logs 'Waiting for background tasks to complete', blocking the restart until the whole geocoding job finishes (supervisor SIGKILLs after stopwaitsecs=30, so auto-resume then covers it, but a deploy/restart hangs up to 30 s). Also @app.on_event('startup') is deprecated in the installed FastAPI (DeprecationWarning) - migrate to a lifespan handler."
+      },
+      {
+        "endpoint": "db.geocode_cache",
+        "issue": "No TTL / size bound on the new collection; it grows unbounded (one doc per address string, _id = raw address). Worth a TTL index or periodic prune."
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_auto_resume_persistence.py",
+    "/app/test_reports/pytest/iteration8_resume.xml",
+    "/app/test_reports/pytest/iteration8_regression.xml"
+  ],
+  "action_items": [
+    "Fix GET /api/cache/stats: use entry.get('latitude') instead of entry['lat'] (currently 500 KeyError).",
+    "Zero-pad German PLZ to 5 digits when parsing Excel (pandas int64 coercion drops the leading zero and changes geocoding results by kilometres for 0-prefixed PLZ such as 06493 / 04565 / 04567).",
+    "Harden GET /api/jobs against missing fields (use .get with defaults).",
+    "Optional: flush processed_addresses every address (or every 2-3) so small files and resumed jobs show real progress.",
+    "Optional: persist geocoding failures (with attempt count) so a resume does not re-run the full API cascade for every previously failed address.",
+    "Optional: migrate @app.on_event('startup') to a FastAPI lifespan handler (deprecated)."
+  ],
+  "critical_code_review_comments": [
+    "server.py is 4100 lines - well over the 700-line guideline; split geocoding, parsing/optimization and API routes into modules.",
+    "/api/cache/stats reads a cache-entry key ('lat') that the cache never writes ('latitude') - dead/broken code path proving the endpoint is untested.",
+    "Auto-resume re-runs the job from address 1 and relies entirely on the cache; it does not skip already-processed rows, so correctness depends on the cache never being pruned mid-job (the in-loop 'clear oldest half of address_cache' at i % 1000 == 0 still exists, though Mongo now backs it up).",
+    "file_data is stored as inline BSON Binary limited to <14 MB; files >=14 MB silently lose the auto-resume capability with no warning to the user or in the job document."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_auto_resume_persistence.py"
+  ],
+  "success_rate": {
+    "backend": "100% (12/12 assertions groups: 3 new auto-resume/cache tests + 9 regression tests + test_rebuild.py, all green)",
+    "frontend": "not tested (backend-only request)"
+  },
+  "seed_data_creation": "Temporary jobs from a generated 120-row xlsx (real streets in 39397 Schwanebeck / 06493 Ballenstedt, filenames TEST_auto_resume*.xlsx). All test jobs deleted via DELETE /api/job/{id} (0 TEST_ jobs remain). Removed 197 synthetic/wrong-PLZ geocode_cache entries; 190 legitimate cache docs remain. Real user jobs untouched - Schwanebeck bcea122c is still 'error' (no file_data, correct), 990ecb84 / e3dbe9db / 0cc914d1 still 'completed'.",
+  "should_call_test_agent_after_fix": true,
+  "should_main_agent_self_test": false,
+  "test_credentials": "none required (no auth in this app)",
+  "context_for_next_testing_agent": "IMPORTANT test-harness knowledge for reproducing a mid-job crash: 'sudo supervisorctl restart backend' does NOT interrupt a geocoding job - uvicorn graceful shutdown waits for the BackgroundTask, so the job completes and auto-resume never triggers. 'supervisorctl signal KILL backend' and 'pkill -9 -f uvicorn' also fail: uvicorn --reload spawns the actual server as a multiprocessing child with a different cmdline, which survives and keeps :8001, after which supervisor restarts loop with 'Address already in use' and go FATAL (this broke my first three attempts and required manual recovery: kill the pid from `ss -Hltnp 'sport = :8001'` then `sudo supervisorctl start backend`). The working helper is hard_kill_backend() in /app/backend/tests/test_auto_resume_persistence.py (kills the :8001 listener PID + the reloader, then supervisorctl start). Second gotcha: backend stdout (print()) is block-buffered, so 'Auto-Resume fuer Job' appears in /var/log/supervisor/backend.out.log with a delay - assert on the job document/API first and check the log only after the job completes. Third: use uncached house numbers for any timing test (geocode_cache persists across runs now); previous iterations used hnr 1-18 and 200-319 on 20 Schwanebeck/Ballenstedt streets. Geocoding runs ~1 addr/s, so use >=120 addresses to get a reliable mid-job window (progress is only flushed every 10 addresses). Uploads must be sequential (singleton asyncio lock).",
+  "rca_of_the_issue": "The reported bug is fixed and verified. Verified behaviour: with a job at processed_addresses=10/120 and status 'geocoding', SIGKILLing the backend and letting supervisor restart it makes on_startup find the orphaned job, see file_data + optimization_type 'geographic_door_to_door', reset status to 'geocoding' with progress_message 'Nach Server-Neustart automatisch fortgesetzt...', log '\u0001f504 Startup: Auto-Resume fuer Job <id>' and relaunch process_geographic_optimization_job; the job then completed 120/120 (86 geocoded), routes doc contained all 120 optimized addresses and GET /api/optimized/{id}/export returned 200. The persistent Mongo cache works: re-uploading the identical file completed in 4.3 s with zero live geocoding attempts and the identical geocoded count, proving cached addresses bypass the API entirely. Jobs without file_data (the user's original bcea122c Schwanebeck job) correctly remain 'error'. Residual risks are listed under backend_issues.minor - most notably that previously FAILED addresses are not cached, so a resume of a large job still burns the full API cascade on them."
+}

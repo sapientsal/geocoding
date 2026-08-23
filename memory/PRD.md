@@ -63,6 +63,16 @@ Die Umgebung wurde auf den Stand von ~04.03.2026 zurückgesetzt (Rollback). Alle
 - Neue Tests: test_numpy_bool_rca.py, test_numpy_bool_storage.py, test_numpy_storage_unit.py, test_e2e_numpy_bool_upload.py
 - Optionale Härtung (Testing-Agent-Hinweis, offen): to_bson_safe auch für addresses_collection.insert_many (Legacy-Pfad, Zeile ~2092); HTTPException-Re-Raise in /api/optimized-Handlern (404 statt 500)
 
+## 2026-08-23: Auto-Resume + persistenter Geocoding-Cache + PLZ-Nullen (Testing-Agent it. 8+9: 100% pass)
+- User-Bug: Schwanebeck-Job (892 Adr.) "hing" bei ~310 – Umgebung ging in Schlafmodus, Neustart killte den Job, aller Fortschritt weg
+- Fix 1 AUTO-RESUME: Upload-Datei wird als BSON Binary im Job-Doc gespeichert (<14MB); Startup-Handler setzt unterbrochene Jobs (mit file_data) automatisch fort statt auf error
+- Fix 2 PERSISTENTER CACHE: Mongo-Collection `geocode_cache` ({_id: adresse, result}); Cache-Hits überspringen APIs UND das 0.1s-Delay → Resume spult bereits erledigte Adressen in Sekunden durch. Fehlschläge werden bewusst NICHT persistiert
+- Fix 3 PLZ-NULLEN (kritisch!): pandas las PLZ als int64 → 06493 wurde "6493" → Geocoding bis 4,5 km daneben. Neuer Helper `normalize_plz()` (zfill(5) bei 3-4-stelligen Ziffern) an allen 4 Adressbau-Stellen. Alle 0er-PLZ-Regionen (Sachsen/Sachsen-Anhalt/Thüringen!) betroffen gewesen
+- Weitere Fixes: /api/cache/stats 500 (entry['lat']→get('latitude')), /api/jobs gehärtet (.get defaults), Progress-Flush alle 5 statt 10, /api/health-Endpoint repariert (Decorator fehlte), toter Legacy-Helper geocode_address_cached gelöscht
+- Schwanebeck-Job selbst hatte kein file_data (vor Fix hochgeladen) → USER MUSS 1x NEU HOCHLADEN, danach greift alles automatisch
+- Neue Tests: test_auto_resume_persistence.py (Hard-Kill-Szenario!), test_plz_zeropad_e2e.py
+- Offen (P2, kosmetisch): FastAPI on_event→lifespan-Migration, TTL für geocode_cache, 16 verwaiste routes-Docs, Fehlschläge mit Versuchszähler persistieren
+
 ## Unterstützte Excel-Formate
 1. Deutsche Glasfaser/Worpswede: `Projektname Strasse` (mit Code-Präfix "624 Worpswede X"), Hausnummer, PLZ, Ort
 2. Standard deutsch: Straße/Strasse, Hausnummer, Zusatz, PLZ, Ort, (Teilort/Ortsteil/Stadtteil/District → OT)
