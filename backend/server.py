@@ -304,7 +304,6 @@ except Exception as e:
 @app.exception_handler(Exception)
 async def global_exception_handler(request, exc):
     """Global exception handler for better error responses"""
-    import traceback
     
     error_id = str(uuid.uuid4())[:8]
     error_details = {
@@ -474,7 +473,7 @@ def sort_addresses_by_street_and_house_number(df, geocoded_data):
                         distances.append(round(distance) if distance else None)
                     else:
                         distances.append(None)
-                except:
+                except Exception:
                     distances.append(None)
             else:
                 distances.append(None)
@@ -1137,28 +1136,6 @@ def optimize_geographic_route(df, geocoded_data, addresses_to_geocode):
     print(f"Average distance between stops: {(total_distance/len([d for d in distances if d]))/1000:.3f} km" if any(distances) else "No valid distances")
     
     return optimized_df, total_distance
-def calculate_distance_meters(lat1: float, lon1: float, lat2: float, lon2: float) -> Optional[float]:
-    """Calculate distance between two points in meters using Haversine formula"""
-    if not all([lat1, lon1, lat2, lon2]):
-        return None
-    
-    # Radius of Earth in meters
-    R = 6371000
-    
-    # Convert to radians
-    lat1_rad = math.radians(lat1)
-    lat2_rad = math.radians(lat2)
-    delta_lat = math.radians(lat2 - lat1)
-    delta_lon = math.radians(lon2 - lon1)
-    
-    # Haversine formula
-    a = (math.sin(delta_lat/2) * math.sin(delta_lat/2) +
-         math.cos(lat1_rad) * math.cos(lat2_rad) *
-         math.sin(delta_lon/2) * math.sin(delta_lon/2))
-    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
-    
-    return R * c
-
 def validate_and_clean_german_address(address: str) -> dict:
     """
     Validate and clean German address format for better geocoding results
@@ -1915,7 +1892,7 @@ async def process_upload_job(job_id: str, file_content: bytes, filename: str):
                 try:
                     df = pd.read_csv(BytesIO(file_content), encoding=encoding)
                     break
-                except:
+                except Exception:
                     continue
             else:
                 raise ValueError("Datei-Encoding konnte nicht erkannt werden. Bitte speichern Sie die Datei als UTF-8.")
@@ -2279,7 +2256,7 @@ async def _process_street_sorted_job_inner(job_id: str, file_content: bytes, fil
                 try:
                     df = pd.read_csv(BytesIO(file_content), encoding=encoding)
                     break
-                except:
+                except Exception:
                     continue
             else:
                 raise ValueError("Datei-Encoding konnte nicht erkannt werden.")
@@ -2792,7 +2769,7 @@ async def _process_geographic_optimization_job_inner(job_id: str, file_content: 
                 try:
                     df = pd.read_csv(BytesIO(file_content), encoding=encoding)
                     break
-                except:
+                except Exception:
                     continue
             else:
                 raise ValueError("Datei-Encoding konnte nicht erkannt werden.")
@@ -3191,7 +3168,7 @@ async def export_optimized_route(job_id: str):
                     try:
                         if len(str(cell.value)) > max_length:
                             max_length = len(str(cell.value))
-                    except:
+                    except Exception:
                         pass
                 adjusted_width = min(max_length + 2, 50)
                 worksheet.column_dimensions[column_letter].width = adjusted_width
@@ -3224,7 +3201,7 @@ async def export_optimized_route(job_id: str):
                     try:
                         if len(str(cell.value)) > max_length:
                             max_length = len(str(cell.value))
-                    except:
+                    except Exception:
                         pass
                 adjusted_width = min(max_length + 2, 50)
                 summary_ws.column_dimensions[column_letter].width = adjusted_width
@@ -3321,7 +3298,7 @@ async def export_street_sorted_route(job_id: str):
                     try:
                         if len(str(cell.value)) > max_length:
                             max_length = len(str(cell.value))
-                    except:
+                    except Exception:
                         pass
                 adjusted_width = min(max_length + 2, 50)
                 worksheet.column_dimensions[column_letter].width = adjusted_width
@@ -3354,7 +3331,7 @@ async def export_street_sorted_route(job_id: str):
                     try:
                         if len(str(cell.value)) > max_length:
                             max_length = len(str(cell.value))
-                    except:
+                    except Exception:
                         pass
                 adjusted_width = min(max_length + 2, 50)
                 summary_ws.column_dimensions[column_letter].width = adjusted_width
@@ -3598,7 +3575,7 @@ async def export_route_excel(job_id: str):
                 try:
                     if len(str(cell.value)) > max_length:
                         max_length = len(str(cell.value))
-                except:
+                except Exception:
                     pass
             adjusted_width = min(max_length + 2, 50)
             ws_route.column_dimensions[column_letter].width = adjusted_width
@@ -3694,7 +3671,7 @@ async def export_route_excel(job_id: str):
                 try:
                     if len(str(cell.value)) > max_length:
                         max_length = len(str(cell.value))
-                except:
+                except Exception:
                     pass
             adjusted_width = min(max_length + 2, 60)
             ws_distances.column_dimensions[column_letter].width = adjusted_width
