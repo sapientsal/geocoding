@@ -73,6 +73,13 @@ Die Umgebung wurde auf den Stand von ~04.03.2026 zurückgesetzt (Rollback). Alle
 - Neue Tests: test_auto_resume_persistence.py (Hard-Kill-Szenario!), test_plz_zeropad_e2e.py
 - Offen (P2, kosmetisch): FastAPI on_event→lifespan-Migration, TTL für geocode_cache, 16 verwaiste routes-Docs, Fehlschläge mit Versuchszähler persistieren
 
+## 2026-09-28: Migrations-Handbuch für CRM-Umzug erstellt
+- User-Entscheidung: Komplett-Umzug des Tools in sein CRM-System (ebenfalls Emergent-Projekt) statt 2x deployen; Design-Redesign (hell, Upload+Jobs gleichwertig, animierter Fortschritt, Unfold-Sales-Logo gelb/weiß) wird DORT im CRM-Stil umgesetzt, nicht mehr hier
+- `/app/MIGRATIONS_HANDBUCH.md` geschrieben: komplette Anleitung für den CRM-Agenten (Dateien 1:1 kopieren, Collections, Endpunkte, 9 kritische Logik-Bausteine mit NICHT-ANFASSEN-Warnung, Excel-Formate-Tabelle, Stolperfallen, Test-Checkliste, Design-Vorgaben)
+- Lint-Cleanup verifiziert abgeschlossen (0 bare excepts, doppelte calculate_distance_meters entfernt, traceback-Import bereinigt); Regressionstests 9/9 + rebuild grün
+- Fahrplan: User macht "Save to GitHub" → gibt Repo-Link + Handbuch dem CRM-Agenten → dort testen → dieses Projekt bleibt Fallback bis CRM nachweislich läuft
+- Tool weiter aktiv genutzt: Huy (2650), Teichbreite (267), Wohltberg (239) erfolgreich verarbeitet
+
 ## Unterstützte Excel-Formate
 1. Deutsche Glasfaser/Worpswede: `Projektname Strasse` (mit Code-Präfix "624 Worpswede X"), Hausnummer, PLZ, Ort
 2. Standard deutsch: Straße/Strasse, Hausnummer, Zusatz, PLZ, Ort, (Teilort/Ortsteil/Stadtteil/District → OT)
